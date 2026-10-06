@@ -1,17 +1,60 @@
 """FastAPI application entry point."""
 
+from collections.abc import AsyncIterator, Callable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
+
 from fastapi import FastAPI
 
 from app.api.routes import health
+from app.core.config import Settings, get_settings
+from app.core.redis import create_redis_client
+from app.db.session import create_engine, create_session_factory
 
 
-def create_app() -> FastAPI:
+def _build_lifespan(
+    settings: Settings,
+) -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:
+    """Build the lifespan handler that owns the shared infrastructure clients.
+
+    Args:
+        settings: Settings used to configure the clients.
+
+    Returns:
+        A lifespan context manager factory for ``FastAPI``.
+    """
+
+    @asynccontextmanager
+    async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+        engine = create_engine(settings.database_url)
+        redis = create_redis_client(settings.redis_url)
+        application.state.engine = engine
+        application.state.session_factory = create_session_factory(engine)
+        application.state.redis = redis
+        try:
+            yield
+        finally:
+            await redis.aclose()
+            await engine.dispose()
+
+    return lifespan
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
     """Build and configure the FastAPI application.
+
+    Args:
+        settings: Settings to use. Defaults to the process-wide settings.
 
     Returns:
         The configured application with all routers registered.
     """
-    application = FastAPI(title="EchoSing API", version="0.1.0")
+    resolved = settings or get_settings()
+    application = FastAPI(
+        title="EchoSing API",
+        version="0.1.0",
+        lifespan=_build_lifespan(resolved),
+    )
+    application.dependency_overrides[get_settings] = lambda: resolved
     application.include_router(health.router)
     return application
 

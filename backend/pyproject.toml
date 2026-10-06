@@ -5,8 +5,12 @@ description = "AI-powered karaoke engine: ingestion pipeline, catalog API and sc
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "asyncpg>=0.32.0",
     "fastapi>=0.142.2",
     "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "redis>=8.1.0",
+    "sqlalchemy[asyncio]>=2.1.3",
     "uvicorn[standard]>=0.54.0",
 ]
 
@@ -37,6 +41,10 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 pythonpath = ["."]
+addopts = "-m 'not integration'"
+markers = [
+    "integration: requires the docker compose services (run with -m integration)",
+]
 
 [dependency-groups]
 dev = [
