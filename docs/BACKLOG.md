@@ -70,7 +70,7 @@ EchoSing/
 
 ## E0 — Fundaciones
 
-- [ ] **US-0.1 Scaffolding del backend.** Proyecto FastAPI con `uv`, Ruff, mypy strict y pytest.
+- [x] **US-0.1 Scaffolding del backend.** Proyecto FastAPI con `uv`, Ruff, mypy strict y pytest.
   *AC:* `GET /health` → 200; `ruff check`, `mypy --strict` y `pytest` pasan; `git init` +
   `.gitignore` (excluye audio, `storage/` y modelos).
 - [ ] **US-0.2 Config e infraestructura local.** `docker-compose` con Postgres y Redis;
