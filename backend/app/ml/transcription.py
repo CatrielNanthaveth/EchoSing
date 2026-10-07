@@ -269,8 +269,10 @@ def _isolated_hallucination_length(
 class WhisperTranscriber:
     """``Transcriber`` running the OpenAI Whisper CLI in a subprocess.
 
-    Settings are tuned for singing: no conditioning on previous text (avoids
-    repetition loops) and skipping of hallucinations around long silences.
+    Settings are tuned for singing: no conditioning on previous text, which
+    avoids repetition loops. Whisper's own hallucination-silence filter is off
+    by default because it drops real words in fast lyrics (e.g. rap); known
+    hallucinations are removed afterwards by ``remove_known_hallucinations``.
     """
 
     def __init__(
@@ -278,7 +280,7 @@ class WhisperTranscriber:
         model: str = "large-v3-turbo",
         device: str = "cuda",
         timeout_s: float = 900.0,
-        hallucination_silence_s: float = 2.0,
+        hallucination_silence_s: float | None = None,
         python: str = sys.executable,
     ) -> None:
         """Initialize the transcriber.
@@ -287,8 +289,8 @@ class WhisperTranscriber:
             model: Whisper model name.
             device: Torch device (``cuda`` or ``cpu``).
             timeout_s: Max seconds for one transcription.
-            hallucination_silence_s: Silence threshold used to skip
-                hallucinated segments.
+            hallucination_silence_s: Silence threshold for Whisper's own
+                hallucination filter, or None to disable it.
             python: Python interpreter with Whisper installed.
         """
         self._model = model
@@ -328,8 +330,6 @@ class WhisperTranscriber:
             "True",
             "--condition_on_previous_text",
             "False",
-            "--hallucination_silence_threshold",
-            str(self._hallucination_silence_s),
             "--output_format",
             "json",
             "--output_dir",
@@ -337,6 +337,11 @@ class WhisperTranscriber:
             "--verbose",
             "False",
         ]
+        if self._hallucination_silence_s is not None:
+            command += [
+                "--hallucination_silence_threshold",
+                str(self._hallucination_silence_s),
+            ]
         if language is not None:
             command += ["--language", language]
         return command

@@ -125,9 +125,11 @@ uv run python -m app.cli run-stage transcribe <song_id>
 
 ### Transcription
 
-Whisper runs with word timestamps, without conditioning on previous text (avoids
-repetition loops) and skipping hallucinations around long silences. The output is
-then cleaned up:
+Whisper runs with word timestamps and without conditioning on previous text (avoids
+repetition loops). Its own `--hallucination_silence_threshold` filter is **off** by
+default (`ECHOSING_WHISPER_HALLUCINATION_SILENCE_S` unset): on rap it silently dropped
+real phrases. `large-v3` was also evaluated: no better on those passages, ~20x
+slower and at the edge of 8 GB of VRAM. The output is then cleaned up:
 
 - lyric order is preserved and word times are made strictly increasing;
 - words split at hyphens are merged (`cha` `-cha` -> `cha-cha`);

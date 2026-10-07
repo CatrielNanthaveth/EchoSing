@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from app.core.config import Settings
 from app.ml import transcription
 from app.ml.tools import ToolError
 from app.ml.transcription import (
@@ -113,6 +114,17 @@ def test_command_uses_singing_friendly_options() -> None:
     assert command[command.index("--output_format") + 1] == "json"
     assert command[command.index("--output_dir") + 1] == "out"
     assert command[command.index("--language") + 1] == "es"
+
+
+def test_whisper_hallucination_filter_is_off_by_default() -> None:
+    # It dropped real words in fast rap lyrics; see remove_known_hallucinations.
+    default = WhisperTranscriber(python="py").command(Path("v.flac"), Path("o"), None)
+    from_settings = WhisperTranscriber(
+        hallucination_silence_s=Settings(_env_file=None).whisper_hallucination_silence_s
+    ).command(Path("v.flac"), Path("o"), None)
+
+    assert "--hallucination_silence_threshold" not in default
+    assert "--hallucination_silence_threshold" not in from_settings
 
 
 def test_command_without_language_lets_whisper_detect_it() -> None:
