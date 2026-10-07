@@ -74,3 +74,10 @@ machines. `uv run` does not remove it.
 
 Settings are read from environment variables prefixed with `ECHOSING_` or from
 `backend/.env`. See [.env.example](.env.example).
+
+## Storage
+
+Audio files are stored through the `StorageBackend` protocol (`app/storage/`). The
+current implementation, `LocalStorage`, keeps them under `ECHOSING_STORAGE_ROOT`
+(default `backend/storage/`, git-ignored) using keys like `songs/<song_id>/vocals.wav`.
+Writes are atomic and keys are validated against path traversal.

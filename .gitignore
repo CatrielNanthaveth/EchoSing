@@ -12,8 +12,10 @@ htmlcov/
 # Environment
 .env
 
-# Local storage and generated media
-storage/
+# Local storage data (anchored: must not match the app/storage/ code package)
+/backend/storage/
+
+# Generated media
 *.mp3
 *.wav
 *.m4a

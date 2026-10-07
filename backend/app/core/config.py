@@ -1,6 +1,7 @@
 """Application settings loaded from environment variables and ``.env``."""
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -16,6 +17,7 @@ class Settings(BaseSettings):
         database_url: SQLAlchemy async URL of the PostgreSQL database.
         redis_url: URL of the Redis server.
         health_check_timeout_s: Max seconds a single dependency check may take.
+        storage_root: Directory where ``LocalStorage`` keeps audio files.
     """
 
     model_config = SettingsConfigDict(
@@ -27,6 +29,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://echosing:echosing@localhost:5433/echosing"
     redis_url: str = "redis://localhost:6379/0"
     health_check_timeout_s: float = 2.0
+    storage_root: Path = Path("storage")
 
 
 @lru_cache
