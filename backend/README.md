@@ -132,11 +132,15 @@ with another preset and, if it succeeds, saves it as the song's preset.
 | Preset | Model | Time* | VRAM* | Notes |
 |---|---|---|---|---|
 | `demucs` (default) | `htdemucs`, 5 shifts | ~35 s | ~1.1 GB | Fast and light; some "bubbling" artifacts |
-| `roformer` | Mel-Band RoFormer Inst V2 (audio-separator) | ~75 s | ~5.5 GB | Slightly cleaner on some songs; may add audible residues |
+| `roformer` | BS-RoFormer Viperx 1297 (audio-separator) | ~160–180 s | ~3 GB | Slightly cleaner on some songs; may add audible residues |
 
 \* 3:30 song on an RTX 5060 (8 GB). Each separation runs in a subprocess, so all VRAM
 is released when it ends. Model weights are cached in `ECHOSING_ML_MODELS_DIR`
-(default `~/.cache/echosing/models`; RoFormer weights are ~1.5 GB).
+(default `~/.cache/echosing/models`; BS-RoFormer weights are ~610 MB).
+
+The RoFormer model is configurable (`ECHOSING_ROFORMER_MODEL`, any audio-separator
+model file). Mel-Band RoFormer Inst V2 (`melband_roformer_inst_v2.ckpt`) was also
+evaluated: ~2x faster but ~5.5 GB of VRAM.
 
 Known limitation of every separator: high-pitched vocals share frequencies with
 instrument overtones, so the instrumental can sound duller where they were removed.

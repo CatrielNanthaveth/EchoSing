@@ -143,7 +143,7 @@ class RoformerSeparator:
 
     def __init__(
         self,
-        model: str = "melband_roformer_inst_v2.ckpt",
+        model: str = "model_bs_roformer_ep_317_sdr_12.9755.ckpt",
         models_dir: Path = Path("models"),
         normalization: float = 0.9,
         timeout_s: float = 900.0,

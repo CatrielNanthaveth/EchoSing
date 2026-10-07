@@ -101,8 +101,8 @@ EchoSing/
 - [x] **US-2.2 Separación de fuentes.** `SourceSeparator` → Demucs en subproceso
   (`vocals.flac` + `instrumental.mp3`), validación con `ffprobe` y `duration_ms`. CLI
   `run-stage separate`. Presets por canción (`songs.separation_preset`): `demucs`
-  (htdemucs, 5 shifts, ~35 s, ~1.1 GB VRAM, default) y `roformer` (Mel-Band RoFormer
-  Inst V2 vía audio-separator, ~75 s, ~5.5 GB VRAM).
+  (htdemucs, 5 shifts, ~35 s, ~1.1 GB VRAM, default) y `roformer` (BS-RoFormer Viperx
+  1297 vía audio-separator, ~160–180 s, ~3 GB VRAM).
 - [ ] **US-2.3 Transcripción.** `Transcriber` → Whisper con timestamps por palabra.
 - [ ] **US-2.4 Segmentación en líneas.** Servicio puro (pausas, puntuación, largo máximo).
 - [ ] **US-2.5 F0 de referencia.** `PitchExtractor` → CREPE, curva por línea con máscara

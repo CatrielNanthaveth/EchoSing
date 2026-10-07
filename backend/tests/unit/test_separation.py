@@ -206,5 +206,6 @@ def test_default_settings_match_the_chosen_presets() -> None:
         "htdemucs(shifts=5)"
     )
     assert build_separator(SeparationPreset.ROFORMER, settings).name == (
-        "melband_roformer_inst_v2"
+        "model_bs_roformer_ep_317_sdr_12.9755"
     )
+    assert settings.roformer_normalization == 0.9

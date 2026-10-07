@@ -25,8 +25,8 @@ class SeparationPreset(StrEnum):
 
     Attributes:
         DEMUCS: Demucs ``htdemucs`` with several shifts. Fast, light on VRAM.
-        ROFORMER: Mel-Band RoFormer instrumental model. Slower and heavier, but
-            it can preserve more of the instrumental on some songs.
+        ROFORMER: BS-RoFormer model (audio-separator). Several times slower and
+            heavier on VRAM, but cleaner on some songs.
     """
 
     DEMUCS = "demucs"

@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     separation_timeout_s: float = Field(default=900.0, gt=0)
     demucs_model: str = "htdemucs"
     demucs_shifts: int = Field(default=5, ge=1)
-    roformer_model: str = "melband_roformer_inst_v2.ckpt"
+    roformer_model: str = "model_bs_roformer_ep_317_sdr_12.9755.ckpt"
     roformer_normalization: float = Field(default=0.9, gt=0, le=1)
 
 
