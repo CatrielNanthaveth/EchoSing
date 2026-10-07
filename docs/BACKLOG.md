@@ -100,7 +100,9 @@ EchoSing/
   tarea `ingestion.run` es un placeholder hasta US-2.2–2.6.
 - [x] **US-2.2 Separación de fuentes.** `SourceSeparator` → Demucs en subproceso
   (`vocals.flac` + `instrumental.mp3`), validación con `ffprobe` y `duration_ms`. CLI
-  `run-stage separate`. Medido: canción de 3:36 en ~34 s, ~1.1 GB de VRAM.
+  `run-stage separate`. Presets por canción (`songs.separation_preset`): `demucs`
+  (htdemucs, 5 shifts, ~35 s, ~1.1 GB VRAM, default) y `roformer` (Mel-Band RoFormer
+  Inst V2 vía audio-separator, ~75 s, ~5.5 GB VRAM).
 - [ ] **US-2.3 Transcripción.** `Transcriber` → Whisper con timestamps por palabra.
 - [ ] **US-2.4 Segmentación en líneas.** Servicio puro (pausas, puntuación, largo máximo).
 - [ ] **US-2.5 F0 de referencia.** `PitchExtractor` → CREPE, curva por línea con máscara

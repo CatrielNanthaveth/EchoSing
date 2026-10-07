@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.db.models import Song
 from app.db.session import get_db_session
-from app.domain.enums import SongStatus
+from app.domain.enums import SeparationPreset, SongStatus
 from app.main import create_app
 from app.storage.dependencies import get_storage
 from app.storage.local import LocalStorage
@@ -176,3 +176,45 @@ async def test_queue_outage_returns_503_and_marks_song_failed(
     song = await db_session.scalar(select(Song))
     assert song is not None
     assert song.status is SongStatus.FAILED
+
+
+async def test_upload_with_roformer_preset(
+    admin_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    response = await admin_client.post(
+        "/admin/songs",
+        data={**FORM, "separation_preset": "roformer"},
+        files=_file(),
+        headers=HEADERS,
+    )
+
+    assert response.status_code == 202
+    assert response.json()["separation_preset"] == "roformer"
+    song = await db_session.scalar(select(Song))
+    assert song is not None
+    assert song.separation_preset is SeparationPreset.ROFORMER
+
+
+@pytest.mark.parametrize("value", ["", None])
+async def test_missing_preset_uses_server_default(
+    admin_client: AsyncClient, value: str | None
+) -> None:
+    form = {**FORM} if value is None else {**FORM, "separation_preset": value}
+
+    response = await admin_client.post(
+        "/admin/songs", data=form, files=_file(), headers=HEADERS
+    )
+
+    assert response.status_code == 202
+    assert response.json()["separation_preset"] == "demucs"
+
+
+async def test_unknown_preset_returns_422(admin_client: AsyncClient) -> None:
+    response = await admin_client.post(
+        "/admin/songs",
+        data={**FORM, "separation_preset": "spleeter"},
+        files=_file(),
+        headers=HEADERS,
+    )
+
+    assert response.status_code == 422

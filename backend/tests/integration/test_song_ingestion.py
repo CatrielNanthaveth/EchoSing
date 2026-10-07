@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cli import register_file
 from app.db.models import IngestionJob, Song, SongAsset
-from app.domain.enums import AssetKind, IngestionStage, SongStatus
+from app.domain.enums import AssetKind, IngestionStage, SeparationPreset, SongStatus
 from app.services.song_ingestion import (
     NewSong,
     SongIngestionService,
@@ -165,3 +165,21 @@ async def test_cli_register_file_streams_local_file(
 
     key = f"songs/{result.song_id}/original.ogg"
     assert b"".join([c async for c in await storage.stream(key)]) == b"ogg-bytes"
+
+
+async def test_service_default_preset_applies_when_song_has_none(
+    db_session: AsyncSession, storage: LocalStorage
+) -> None:
+    service = SongIngestionService(
+        db_session,
+        storage,
+        FakeJobQueue(),
+        MAX_BYTES,
+        default_preset=SeparationPreset.ROFORMER,
+    )
+
+    result = await service.register_song(
+        NewSong(title="T", artist="A"), "song.mp3", chunks(b"x")
+    )
+
+    assert result.separation_preset is SeparationPreset.ROFORMER

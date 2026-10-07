@@ -24,7 +24,13 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, str_enum
-from app.domain.enums import AssetKind, IngestionStage, PlaySessionStatus, SongStatus
+from app.domain.enums import (
+    AssetKind,
+    IngestionStage,
+    PlaySessionStatus,
+    SeparationPreset,
+    SongStatus,
+)
 
 
 class Song(Base):
@@ -41,6 +47,11 @@ class Song(Base):
         str_enum(SongStatus, "song_status"), default=SongStatus.PENDING, index=True
     )
     error_message: Mapped[str | None] = mapped_column(Text)
+    separation_preset: Mapped[SeparationPreset] = mapped_column(
+        str_enum(SeparationPreset, "separation_preset"),
+        default=SeparationPreset.DEMUCS,
+        server_default=SeparationPreset.DEMUCS.value,
+    )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), onupdate=func.now()

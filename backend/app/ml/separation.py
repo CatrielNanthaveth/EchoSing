@@ -1,5 +1,6 @@
 """Source separation: split a song into vocals and accompaniment."""
 
+import json
 import sys
 from pathlib import Path
 from typing import Protocol
@@ -61,6 +62,7 @@ class DemucsSeparator:
         model: str = "htdemucs",
         device: str = "cuda",
         timeout_s: float = 900.0,
+        shifts: int = 1,
         python: str = sys.executable,
     ) -> None:
         """Initialize the separator.
@@ -69,17 +71,19 @@ class DemucsSeparator:
             model: Pretrained Demucs model name.
             device: Torch device (``cuda`` or ``cpu``).
             timeout_s: Max seconds for one separation.
+            shifts: Random shifts averaged to reduce artifacts (time x shifts).
             python: Python interpreter with Demucs installed.
         """
         self._model = model
         self._device = device
+        self._shifts = shifts
         self._timeout_s = timeout_s
         self._python = python
 
     @property
     def name(self) -> str:
-        """Identifier of the model, e.g. ``htdemucs``."""
-        return self._model
+        """Identifier of the configuration, e.g. ``htdemucs(shifts=5)``."""
+        return f"{self._model}(shifts={self._shifts})"
 
     def command(self, audio: Path, output_dir: Path) -> list[str]:
         """Build the Demucs command line.
@@ -99,6 +103,8 @@ class DemucsSeparator:
             self._model,
             "-d",
             self._device,
+            "--shifts",
+            str(self._shifts),
             "--two-stems",
             "vocals",
             "--flac",
@@ -125,4 +131,87 @@ class DemucsSeparator:
         for path in (stems.vocals, stems.accompaniment):
             if not path.is_file():
                 raise SeparationError(f"Demucs did not produce {path.name}")
+        return stems
+
+
+class RoformerSeparator:
+    """``SourceSeparator`` running a RoFormer model through ``audio-separator``.
+
+    Like ``DemucsSeparator``, it runs in a subprocess so all GPU memory is
+    released afterwards. audio-separator uses CUDA automatically when available.
+    """
+
+    def __init__(
+        self,
+        model: str = "melband_roformer_inst_v2.ckpt",
+        models_dir: Path = Path("models"),
+        normalization: float = 0.9,
+        timeout_s: float = 900.0,
+        python: str = sys.executable,
+    ) -> None:
+        """Initialize the separator.
+
+        Args:
+            model: audio-separator model file name.
+            models_dir: Directory where model weights are downloaded and cached.
+            normalization: Peak amplitude input and output are normalized to.
+            timeout_s: Max seconds for one separation.
+            python: Python interpreter with audio-separator installed.
+        """
+        self._model = model
+        self._models_dir = models_dir
+        self._normalization = normalization
+        self._timeout_s = timeout_s
+        self._python = python
+
+    @property
+    def name(self) -> str:
+        """Identifier of the model, without the weights file extension."""
+        return Path(self._model).stem
+
+    def command(self, audio: Path, output_dir: Path) -> list[str]:
+        """Build the audio-separator command line.
+
+        Args:
+            audio: Input audio file.
+            output_dir: Output directory.
+
+        Returns:
+            The command and its arguments.
+        """
+        return [
+            self._python,
+            "-c",
+            "from audio_separator.utils.cli import main; main()",
+            str(audio),
+            "--model_filename",
+            self._model,
+            "--model_file_dir",
+            str(self._models_dir),
+            "--output_dir",
+            str(output_dir),
+            "--output_format",
+            "FLAC",
+            "--normalization",
+            str(self._normalization),
+            "--custom_output_names",
+            json.dumps({"Vocals": "vocals", "Instrumental": "instrumental"}),
+            "--log_level",
+            "warning",
+        ]
+
+    async def separate(self, audio: Path, output_dir: Path) -> SeparatedStems:
+        """Run audio-separator. See ``SourceSeparator``."""
+        try:
+            await run_tool(self.command(audio, output_dir), timeout_s=self._timeout_s)
+        except ToolError as error:
+            raise SeparationError(f"audio-separator failed: {error}") from error
+
+        stems = SeparatedStems(
+            vocals=output_dir / "vocals.flac",
+            accompaniment=output_dir / "instrumental.flac",
+        )
+        for path in (stems.vocals, stems.accompaniment):
+            if not path.is_file():
+                raise SeparationError(f"audio-separator did not produce {path.name}")
         return stems

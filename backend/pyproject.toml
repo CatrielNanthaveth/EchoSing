@@ -21,8 +21,9 @@ dependencies = [
 
 [tool.uv]
 package = false
-# The "ml" group (CUDA wheels, ~3 GB) is opt-in: `uv sync --group ml`.
-default-groups = ["dev"]
+# The "ml" group (CUDA wheels, ~3 GB) is installed by default; machines without
+# an NVIDIA GPU can skip it with `uv sync --no-group ml`.
+default-groups = ["dev", "ml"]
 # PyTorch CUDA wheels only exist for Windows and Linux.
 environments = ["sys_platform == 'win32'", "sys_platform == 'linux'"]
 
@@ -34,6 +35,7 @@ explicit = true
 [tool.uv.sources]
 torch = { index = "pytorch-cu128" }
 torchaudio = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
 
 [tool.ruff]
 line-length = 88
@@ -88,9 +90,13 @@ dev = [
     "ruff>=0.16.10",
 ]
 ml = [
+    "audio-separator>=0.47,<0.48",
+    "audioread>=3.1",
     "demucs>=4.1.0",
+    "onnxruntime>=1.30",
     "openai-whisper>=20250625",
     "torch==2.11.0",
     "torchaudio==2.11.0",
     "torchcrepe>=0.0.24",
+    "torchvision==0.26.0",
 ]

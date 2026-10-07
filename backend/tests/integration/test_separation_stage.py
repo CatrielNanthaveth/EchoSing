@@ -9,9 +9,14 @@ from app.core.config import Settings
 from app.db.models import Song, SongAsset
 from app.db.repositories.song_assets import SongAssetRepository
 from app.db.repositories.songs import SongRepository
-from app.domain.enums import AssetKind
+from app.domain.enums import AssetKind, SeparationPreset
 from app.ml.audio import InvalidAudioError
-from app.ml.separation import DemucsSeparator, SeparatedStems, SeparationError
+from app.ml.separation import (
+    DemucsSeparator,
+    RoformerSeparator,
+    SeparatedStems,
+    SeparationError,
+)
 from app.services.pipeline.errors import StageError
 from app.services.pipeline.separation import (
     DurationProbe,
@@ -79,15 +84,30 @@ async def _song_with_original(session: AsyncSession, storage: LocalStorage) -> S
     return song
 
 
+class FakeFactory:
+    """Separator factory that records the presets it was asked for."""
+
+    def __init__(self, separator: FakeSeparator) -> None:
+        self.separator = separator
+        self.presets: list[SeparationPreset] = []
+
+    def __call__(self, preset: SeparationPreset) -> FakeSeparator:
+        self.presets.append(preset)
+        return self.separator
+
+
 def _stage(
     session: AsyncSession,
     storage: LocalStorage,
-    separator: FakeSeparator,
+    separator: FakeSeparator | FakeFactory,
     *,
     probe: DurationProbe = fake_probe,
 ) -> SeparationStage:
+    factory = (
+        separator if isinstance(separator, FakeFactory) else FakeFactory(separator)
+    )
     return SeparationStage(
-        session, storage, separator, probe=probe, encode_mp3=fake_encode_mp3
+        session, storage, factory, probe=probe, encode_mp3=fake_encode_mp3
     )
 
 
@@ -111,6 +131,7 @@ async def test_stores_stems_and_duration(
     result = await _stage(db_session, storage, separator).run(song.id)
 
     assert result.duration_ms == DURATION_MS
+    assert result.preset is SeparationPreset.DEMUCS
     assert result.separator == "fake-demucs"
     assert separator.calls[0].read_bytes() == b"original-audio"
 
@@ -208,18 +229,61 @@ async def test_database_failure_rolls_back_asset_registration(
     assert set(await _assets(db_session, song_id)) == {AssetKind.ORIGINAL}
 
 
-def test_build_separation_stage_uses_settings(tmp_path: Path) -> None:
-    settings = Settings(
-        _env_file=None,
-        separator_model="htdemucs_ft",
-        ml_device="cpu",
-        separation_timeout_s=42,
+async def test_uses_the_song_preset(
+    db_session: AsyncSession, storage: LocalStorage
+) -> None:
+    song = await _song_with_original(db_session, storage)
+    await SongRepository(db_session).set_separation_preset(
+        song.id, SeparationPreset.ROFORMER
     )
+    factory = FakeFactory(FakeSeparator())
+
+    result = await _stage(db_session, storage, factory).run(song.id)
+
+    assert factory.presets == [SeparationPreset.ROFORMER]
+    assert result.preset is SeparationPreset.ROFORMER
+
+
+async def test_override_preset_is_saved_on_success(
+    db_session: AsyncSession, storage: LocalStorage
+) -> None:
+    song = await _song_with_original(db_session, storage)
+    factory = FakeFactory(FakeSeparator())
+
+    await _stage(db_session, storage, factory).run(song.id, SeparationPreset.ROFORMER)
+
+    assert factory.presets == [SeparationPreset.ROFORMER]
+    refreshed = await db_session.get(Song, song.id)
+    assert refreshed is not None
+    assert refreshed.separation_preset is SeparationPreset.ROFORMER
+
+
+async def test_override_preset_is_not_saved_on_failure(
+    db_session: AsyncSession, storage: LocalStorage
+) -> None:
+    song = await _song_with_original(db_session, storage)
+    song_id = song.id
+
+    with pytest.raises(SeparationError):
+        await _stage(db_session, storage, FakeSeparator(fail=True)).run(
+            song_id, SeparationPreset.ROFORMER
+        )
+
+    db_session.expire_all()
+    refreshed = await db_session.get(Song, song_id)
+    assert refreshed is not None
+    assert refreshed.separation_preset is SeparationPreset.DEMUCS
+
+
+def test_build_separation_stage_builds_separators_from_settings(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(_env_file=None, demucs_model="htdemucs_ft", demucs_shifts=3)
 
     stage = build_separation_stage(None, LocalStorage(tmp_path), settings)  # type: ignore[arg-type]
 
-    separator = stage._separator
-    assert isinstance(separator, DemucsSeparator)
-    command = separator.command(Path("a.mp3"), Path("out"))
-    assert command[command.index("-n") + 1] == "htdemucs_ft"
-    assert command[command.index("-d") + 1] == "cpu"
+    demucs = stage._separator_factory(SeparationPreset.DEMUCS)
+    roformer = stage._separator_factory(SeparationPreset.ROFORMER)
+    assert isinstance(demucs, DemucsSeparator)
+    assert demucs.name == "htdemucs_ft(shifts=3)"
+    assert isinstance(roformer, RoformerSeparator)

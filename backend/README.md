@@ -53,20 +53,21 @@ Alembic emits the CHECK constraint twice; keep a single `ck_<table>_<enum>` one.
 Integration tests use a separate `echosing_test` database, created automatically and
 rebuilt from the migrations on every run; your development data is never touched.
 
-## ML stack (GPU machines only)
+## ML stack
 
-The ingestion pipeline (Demucs, Whisper, CREPE) lives in the optional `ml` dependency
-group. It pins `torch==2.11.0+cu128`, the newest CUDA build with a matching
-`torchaudio`, which supports Blackwell GPUs (`sm_120`, e.g. RTX 50xx).
+The ingestion pipeline (Demucs, audio-separator/RoFormer, Whisper, CREPE) lives in
+the `ml` dependency group, **installed by default**. It pins `torch==2.11.0+cu128`
+(and matching `torchaudio`/`torchvision`), the newest CUDA build set that supports
+Blackwell GPUs (`sm_120`, e.g. RTX 50xx).
 
 ```bash
 # Prerequisite (Windows): winget install --id Gyan.FFmpeg -e
-uv sync --group ml                     # ~3 GB of CUDA wheels
+uv sync                                # includes ~3 GB of CUDA wheels
 uv run python -m scripts.check_gpu     # verifies CUDA, sm_120, FFmpeg and ML imports
 ```
 
-Note: a plain `uv sync` removes the `ml` group again; use `uv sync --group ml` on GPU
-machines. `uv run` does not remove it.
+On machines without an NVIDIA GPU (API or scoring work only), skip it with
+`uv sync --no-group ml`; tests never need it.
 
 `GET /health` returns 200 when PostgreSQL and Redis are reachable, 503 otherwise.
 
@@ -98,6 +99,9 @@ Or from the command line, without HTTP:
 uv run python -m app.cli add-song song.mp3 --title "Song title" --artist "Artist" --language es
 ```
 
+Both accept a separation preset (`separation_preset` form field / `--separator`),
+`demucs` or `roformer`; see [Separation presets](#separation-presets).
+
 Accepted formats: mp3, m4a, wav, flac, ogg, up to `ECHOSING_MAX_UPLOAD_BYTES`
 (50 MB by default). Note that the web server receives the whole request before the
 limit is checked, so in production a reverse proxy (e.g. nginx
@@ -110,17 +114,32 @@ or to re-process a song; needs the `ml` group):
 
 ```bash
 uv run python -m app.cli run-stage separate <song_id>
+uv run python -m app.cli run-stage separate <song_id> --separator roformer  # switch preset
 ```
 
 | Stage | Tool | Produces |
 |---|---|---|
-| `separate` | Demucs (`htdemucs`, subprocess) + FFmpeg | `vocals.flac` (input for transcription and pitch), `instrumental.mp3` 192 kbps (streamed to clients), `songs.duration_ms` |
-
-Reference run on an RTX 5060 (8 GB): a 3:36 song separates in ~34 s using ~1.1 GB of
-VRAM, fully released when the subprocess exits.
+| `separate` | Separation preset (subprocess) + FFmpeg | `vocals.flac` (input for transcription and pitch), `instrumental.mp3` 192 kbps (streamed to clients), `songs.duration_ms` |
 
 MP3 encoders prepend a short silence (~25 ms) that browsers may not trim; it is a
 constant offset absorbed by the client's latency calibration.
+
+### Separation presets
+
+Each song stores its `separation_preset`. `--separator` on `run-stage` re-processes
+with another preset and, if it succeeds, saves it as the song's preset.
+
+| Preset | Model | Time* | VRAM* | Notes |
+|---|---|---|---|---|
+| `demucs` (default) | `htdemucs`, 5 shifts | ~35 s | ~1.1 GB | Fast and light; some "bubbling" artifacts |
+| `roformer` | Mel-Band RoFormer Inst V2 (audio-separator) | ~75 s | ~5.5 GB | Slightly cleaner on some songs; may add audible residues |
+
+\* 3:30 song on an RTX 5060 (8 GB). Each separation runs in a subprocess, so all VRAM
+is released when it ends. Model weights are cached in `ECHOSING_ML_MODELS_DIR`
+(default `~/.cache/echosing/models`; RoFormer weights are ~1.5 GB).
+
+Known limitation of every separator: high-pitched vocals share frequencies with
+instrument overtones, so the instrumental can sound duller where they were removed.
 
 ## Storage
 

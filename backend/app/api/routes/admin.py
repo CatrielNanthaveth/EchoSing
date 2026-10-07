@@ -48,10 +48,23 @@ async def upload_song(
     artist: Annotated[str, Form()],
     service: Annotated[SongIngestionService, Depends(get_song_ingestion_service)],
     language: Annotated[str | None, Form()] = None,
+    separation_preset: Annotated[str | None, Form()] = None,
 ) -> SongRegistration:
-    """Upload a song and queue it for processing."""
+    """Upload a song and queue it for processing.
+
+    ``separation_preset`` is ``demucs`` or ``roformer``; empty means the
+    server default.
+    """
     try:
-        new_song = NewSong(title=title, artist=artist, language=language or None)
+        # Empty form fields mean "not provided".
+        new_song = NewSong.model_validate(
+            {
+                "title": title,
+                "artist": artist,
+                "language": language or None,
+                "separation_preset": separation_preset or None,
+            }
+        )
     except ValidationError as error:
         raise RequestValidationError(error.errors()) from error
 

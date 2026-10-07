@@ -3,7 +3,7 @@
 Usage (from ``backend/``)::
 
     uv run python -m app.cli add-song song.mp3 --title "Title" --artist "Artist"
-    uv run python -m app.cli run-stage separate <song_id>
+    uv run python -m app.cli run-stage separate <song_id> [--separator roformer]
 
 ``run-stage`` runs a single ingestion stage synchronously, without Celery. It is
 meant for development and for re-processing one song by hand.
@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 from app.core.config import Settings, get_settings
 from app.db.session import create_engine, create_session_factory
+from app.domain.enums import SeparationPreset
 from app.services.pipeline.separation import build_separation_stage
 from app.services.song_ingestion import (
     NewSong,
@@ -51,12 +52,24 @@ def build_parser() -> argparse.ArgumentParser:
     add_song.add_argument("--title", required=True)
     add_song.add_argument("--artist", required=True)
     add_song.add_argument("--language", help="ISO 639-1 code, e.g. 'es'")
+    add_song.add_argument(
+        "--separator",
+        type=SeparationPreset,
+        choices=list(SeparationPreset),
+        help="Separation preset (default: server setting)",
+    )
 
     run_stage = commands.add_parser(
         "run-stage", help="Run one ingestion stage for a song, without Celery"
     )
     run_stage.add_argument("stage", choices=STAGES)
     run_stage.add_argument("song_id", type=uuid.UUID)
+    run_stage.add_argument(
+        "--separator",
+        type=SeparationPreset,
+        choices=list(SeparationPreset),
+        help="Override and save the song's separation preset",
+    )
     return parser
 
 
@@ -100,8 +113,14 @@ async def _add_song(args: argparse.Namespace, settings: Settings) -> BaseModel:
                 LocalStorage(settings.storage_root),
                 CeleryJobQueue(celery_app),
                 settings.max_upload_bytes,
+                settings.default_separation_preset,
             )
-            song = NewSong(title=args.title, artist=args.artist, language=args.language)
+            song = NewSong(
+                title=args.title,
+                artist=args.artist,
+                language=args.language,
+                separation_preset=args.separator,
+            )
             return await register_file(service, args.path, song)
     finally:
         await engine.dispose()
@@ -114,7 +133,7 @@ async def _run_stage(args: argparse.Namespace, settings: Settings) -> BaseModel:
         async with create_session_factory(engine)() as session:
             storage = LocalStorage(settings.storage_root)
             stage = build_separation_stage(session, storage, settings)
-            return await stage.run(args.song_id)
+            return await stage.run(args.song_id, args.separator)
     finally:
         await engine.dispose()
 

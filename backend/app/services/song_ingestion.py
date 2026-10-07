@@ -15,7 +15,7 @@ from app.db.repositories.ingestion_jobs import IngestionJobRepository
 from app.db.repositories.song_assets import SongAssetRepository
 from app.db.repositories.songs import SongRepository
 from app.db.session import get_db_session
-from app.domain.enums import AssetKind, IngestionStage, SongStatus
+from app.domain.enums import AssetKind, IngestionStage, SeparationPreset, SongStatus
 from app.storage.base import StorageBackend
 from app.storage.dependencies import get_storage
 from app.storage.keys import asset_key, song_prefix
@@ -45,6 +45,8 @@ class NewSong(BaseModel):
         title: Song title.
         artist: Performing artist.
         language: ISO 639-1 code of the lyrics language, if known.
+        separation_preset: How to split vocals and instrumental; the service
+            default applies when None.
     """
 
     model_config = ConfigDict(str_strip_whitespace=True, frozen=True)
@@ -52,6 +54,7 @@ class NewSong(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     artist: str = Field(min_length=1, max_length=200)
     language: str | None = Field(default=None, pattern=r"^[a-z]{2}$")
+    separation_preset: SeparationPreset | None = None
 
 
 class SongRegistration(BaseModel):
@@ -62,12 +65,14 @@ class SongRegistration(BaseModel):
         job_id: Id of the ingestion job created for it.
         status: Status of the song.
         stage: Stage of the ingestion job.
+        separation_preset: Preset that will be used to split the song.
     """
 
     song_id: uuid.UUID
     job_id: uuid.UUID
     status: SongStatus
     stage: IngestionStage
+    separation_preset: SeparationPreset
 
 
 class SongIngestionService:
@@ -79,6 +84,7 @@ class SongIngestionService:
         storage: StorageBackend,
         queue: JobQueue,
         max_upload_bytes: int,
+        default_preset: SeparationPreset = SeparationPreset.DEMUCS,
     ) -> None:
         """Initialize the service.
 
@@ -87,11 +93,13 @@ class SongIngestionService:
             storage: Where the original audio file is stored.
             queue: Queue that runs the ingestion pipeline.
             max_upload_bytes: Max accepted size of the audio file.
+            default_preset: Separation preset for songs that do not choose one.
         """
         self._session = session
         self._storage = storage
         self._queue = queue
         self._max_upload_bytes = max_upload_bytes
+        self._default_preset = default_preset
         self._songs = SongRepository(session)
         self._assets = SongAssetRepository(session)
         self._jobs = IngestionJobRepository(session)
@@ -138,7 +146,11 @@ class SongIngestionService:
         await self._jobs.set_task_id(job, task_id)
         await self._session.commit()
         return SongRegistration(
-            song_id=record.id, job_id=job.id, status=record.status, stage=job.stage
+            song_id=record.id,
+            job_id=job.id,
+            status=record.status,
+            stage=job.stage,
+            separation_preset=record.separation_preset,
         )
 
     async def _persist(
@@ -153,7 +165,12 @@ class SongIngestionService:
         # rollback below, and reading their attributes would then hit the DB.
         song_id: uuid.UUID | None = None
         try:
-            record = await self._songs.add(song.title, song.artist, song.language)
+            record = await self._songs.add(
+                song.title,
+                song.artist,
+                song.language,
+                song.separation_preset or self._default_preset,
+            )
             song_id = record.id
             stored = await self._storage.save(
                 asset_key(record.id, AssetKind.ORIGINAL, extension),
@@ -205,4 +222,10 @@ def get_song_ingestion_service(
     Returns:
         The service.
     """
-    return SongIngestionService(session, storage, queue, settings.max_upload_bytes)
+    return SongIngestionService(
+        session,
+        storage,
+        queue,
+        settings.max_upload_bytes,
+        settings.default_separation_preset,
+    )

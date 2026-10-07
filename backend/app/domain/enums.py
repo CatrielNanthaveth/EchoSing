@@ -20,6 +20,19 @@ class AssetKind(StrEnum):
     INSTRUMENTAL = "instrumental"
 
 
+class SeparationPreset(StrEnum):
+    """Source separation configuration chosen for a song.
+
+    Attributes:
+        DEMUCS: Demucs ``htdemucs`` with several shifts. Fast, light on VRAM.
+        ROFORMER: Mel-Band RoFormer instrumental model. Slower and heavier, but
+            it can preserve more of the instrumental on some songs.
+    """
+
+    DEMUCS = "demucs"
+    ROFORMER = "roformer"
+
+
 class IngestionStage(StrEnum):
     """Current stage of an ingestion job."""
 

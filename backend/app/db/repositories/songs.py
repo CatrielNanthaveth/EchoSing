@@ -8,7 +8,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Song, SongAnalysis
-from app.domain.enums import SongStatus
+from app.domain.enums import SeparationPreset, SongStatus
 
 
 class SongRepository:
@@ -26,18 +26,30 @@ class SongRepository:
         """
         self._session = session
 
-    async def add(self, title: str, artist: str, language: str | None = None) -> Song:
+    async def add(
+        self,
+        title: str,
+        artist: str,
+        language: str | None = None,
+        separation_preset: SeparationPreset = SeparationPreset.DEMUCS,
+    ) -> Song:
         """Create a song in ``PENDING`` status.
 
         Args:
             title: Song title.
             artist: Performing artist.
             language: ISO 639-1 code of the lyrics language, if known.
+            separation_preset: How its vocals and instrumental will be split.
 
         Returns:
             The persisted song, with its generated id.
         """
-        song = Song(title=title, artist=artist, language=language)
+        song = Song(
+            title=title,
+            artist=artist,
+            language=language,
+            separation_preset=separation_preset,
+        )
         self._session.add(song)
         await self._session.flush()
         return song
@@ -93,6 +105,25 @@ class SongRepository:
         if song is None:
             return False
         song.duration_ms = duration_ms
+        await self._session.flush()
+        return True
+
+    async def set_separation_preset(
+        self, song_id: uuid.UUID, preset: SeparationPreset
+    ) -> bool:
+        """Record the separation preset of a song.
+
+        Args:
+            song_id: Id of the song.
+            preset: Preset to use for (re)processing it.
+
+        Returns:
+            True if the song exists and was updated.
+        """
+        song = await self._session.get(Song, song_id)
+        if song is None:
+            return False
+        song.separation_preset = preset
         await self._session.flush()
         return True
 
