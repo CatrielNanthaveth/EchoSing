@@ -30,7 +30,8 @@ storage/
 node_modules/
 dist/
 
-# Editors / OS
+# Editors / OS / tooling
+.claude/
 .vscode/
 .idea/
 Thumbs.db

@@ -37,7 +37,7 @@ EchoSing es una aplicación interactiva de karaoke que utiliza modelos avanzados
 
 ### Frontend (Aplicación de Usuario)
 *   **Framework:** React Native (con Expo Audio) o Flutter. Esto permite compilar para iOS y Android con una sola base de código.
-*   **Procesamiento Edge (Cliente):** 
+*   **Procesamiento Edge (Cliente):**
     *   Uso de C++ / WebAssembly o librerías nativas (como `aubio` o un modelo ONNX ligero) para ejecutar el algoritmo **YIN** en el dispositivo móvil y extraer la afinación del usuario sin enviar el audio de vuelta al servidor.
 *   **Animaciones:** Reanimated (React Native) o Rive para lograr barras de progreso y puntajes fluidos a 60fps.
 

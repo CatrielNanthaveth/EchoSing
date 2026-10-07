@@ -17,7 +17,13 @@ docker compose up -d --wait
 # From backend/
 cp .env.example .env   # optional: defaults already match docker-compose.yml
 uv sync
+
+# From the repository root: install the git pre-commit hook (ruff, mypy, hygiene)
+uv run --project backend pre-commit install
 ```
+
+The hook runs automatically on `git commit`. To run it manually on every file:
+`uv run --project backend pre-commit run --all-files`.
 
 ## Commands
 

@@ -76,7 +76,7 @@ EchoSing/
 - [x] **US-0.2 Config e infraestructura local.** `docker-compose` con Postgres y Redis;
   `Settings` con pydantic-settings; `.env.example`.
   *AC:* `/health` reporta el estado de DB y Redis.
-- [ ] **US-0.3 Pre-commit.** Hooks de ruff + mypy.
+- [x] **US-0.3 Pre-commit.** Hooks de ruff + mypy.
 - [ ] **US-0.4 Smoke test de GPU.** Grupo de dependencias `ml` (torch cu128, demucs,
   openai-whisper, torchcrepe) separado de las dependencias base. Script
   `scripts/check_gpu.py` que verifica CUDA y soporte sm_120.
