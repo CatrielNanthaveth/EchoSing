@@ -35,8 +35,23 @@ uv run pytest                          # unit tests (no Docker needed)
 uv run pytest -m integration           # integration tests (needs docker compose up)
 uv run ruff check .                    # lint
 uv run ruff format .                   # format
-uv run mypy app tests                  # type check (strict)
+uv run mypy app tests scripts          # type check (strict)
 ```
+
+## ML stack (GPU machines only)
+
+The ingestion pipeline (Demucs, Whisper, CREPE) lives in the optional `ml` dependency
+group. It pins `torch==2.11.0+cu128`, the newest CUDA build with a matching
+`torchaudio`, which supports Blackwell GPUs (`sm_120`, e.g. RTX 50xx).
+
+```bash
+# Prerequisite (Windows): winget install --id Gyan.FFmpeg -e
+uv sync --group ml                     # ~3 GB of CUDA wheels
+uv run python -m scripts.check_gpu     # verifies CUDA, sm_120, FFmpeg and ML imports
+```
+
+Note: a plain `uv sync` removes the `ml` group again; use `uv sync --group ml` on GPU
+machines. `uv run` does not remove it.
 
 `GET /health` returns 200 when PostgreSQL and Redis are reachable, 503 otherwise.
 

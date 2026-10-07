@@ -16,6 +16,19 @@ dependencies = [
 
 [tool.uv]
 package = false
+# The "ml" group (CUDA wheels, ~3 GB) is opt-in: `uv sync --group ml`.
+default-groups = ["dev"]
+# PyTorch CUDA wheels only exist for Windows and Linux.
+environments = ["sys_platform == 'win32'", "sys_platform == 'linux'"]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchaudio = { index = "pytorch-cu128" }
 
 [tool.ruff]
 line-length = 88
@@ -36,6 +49,11 @@ strict = true
 python_version = "3.12"
 plugins = ["pydantic.mypy"]
 
+[[tool.mypy.overrides]]
+# ML packages are untyped or live in the optional "ml" group, which may be absent.
+module = ["torch.*", "demucs.*", "whisper.*", "torchcrepe.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
@@ -55,4 +73,11 @@ dev = [
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.10",
+]
+ml = [
+    "demucs>=4.1.0",
+    "openai-whisper>=20250625",
+    "torch==2.11.0",
+    "torchaudio==2.11.0",
+    "torchcrepe>=0.0.24",
 ]
