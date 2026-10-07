@@ -28,7 +28,7 @@ repos:
         pass_filenames: false
       - id: mypy
         name: mypy (strict)
-        entry: uv run --directory backend mypy app tests scripts
+        entry: uv run --directory backend mypy app tests scripts alembic
         language: system
         files: ^backend/.*\.py$
         pass_filenames: false
