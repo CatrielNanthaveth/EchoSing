@@ -5,7 +5,7 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api.routes import health
+from app.api.routes import admin, health
 from app.core.config import Settings, get_settings
 from app.core.redis import create_redis_client
 from app.db.session import create_engine, create_session_factory
@@ -56,6 +56,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     application.dependency_overrides[get_settings] = lambda: resolved
     application.include_router(health.router)
+    application.include_router(admin.router)
     return application
 
 

@@ -94,8 +94,10 @@ EchoSing/
 
 ## E2 — Pipeline de ingesta
 
-- [ ] **US-2.1 Alta de canción (admin).** `POST /admin/songs` y comando CLI; crea la canción
-  en estado PENDING y encola el job.
+- [x] **US-2.1 Alta de canción (admin).** `POST /admin/songs` (protegido con
+  `X-Admin-Token`) y comando CLI; crea la canción en estado PENDING y encola el job.
+  Incluye la app Celery mínima y la interfaz `JobQueue` (adelantadas de US-2.6); la
+  tarea `ingestion.run` es un placeholder hasta US-2.2–2.6.
 - [ ] **US-2.2 Separación de fuentes.** `SourceSeparator` → Demucs (vocals + instrumental).
 - [ ] **US-2.3 Transcripción.** `Transcriber` → Whisper con timestamps por palabra.
 - [ ] **US-2.4 Segmentación en líneas.** Servicio puro (pausas, puntuación, largo máximo).

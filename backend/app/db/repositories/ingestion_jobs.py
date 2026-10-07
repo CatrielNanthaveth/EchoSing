@@ -51,6 +51,16 @@ class IngestionJobRepository:
             .limit(1)
         )
 
+    async def set_task_id(self, job: IngestionJob, task_id: str) -> None:
+        """Record the id of the queued task running the job.
+
+        Args:
+            job: Job to update.
+            task_id: Id returned by the job queue.
+        """
+        job.task_id = task_id
+        await self._session.flush()
+
     async def set_stage(
         self,
         job: IngestionJob,

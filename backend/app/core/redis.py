@@ -16,7 +16,8 @@ def create_redis_client(url: str) -> Redis:
     Returns:
         A new async Redis client. The caller must close it with ``aclose()``.
     """
-    return Redis.from_url(url)
+    client: Redis = Redis.from_url(url)
+    return client
 
 
 def get_redis(request: Request) -> Redis:

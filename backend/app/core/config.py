@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +19,9 @@ class Settings(BaseSettings):
         redis_url: URL of the Redis server.
         health_check_timeout_s: Max seconds a single dependency check may take.
         storage_root: Directory where ``LocalStorage`` keeps audio files.
+        admin_token: Shared secret required in ``X-Admin-Token`` by admin
+            endpoints. When unset, admin endpoints are disabled.
+        max_upload_bytes: Max size of an uploaded song file.
     """
 
     model_config = SettingsConfigDict(
@@ -30,6 +34,8 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     health_check_timeout_s: float = 2.0
     storage_root: Path = Path("storage")
+    admin_token: SecretStr | None = None
+    max_upload_bytes: int = Field(default=50 * 1024 * 1024, gt=0)
 
 
 @lru_cache

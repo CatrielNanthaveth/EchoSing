@@ -75,6 +75,34 @@ machines. `uv run` does not remove it.
 Settings are read from environment variables prefixed with `ECHOSING_` or from
 `backend/.env`. See [.env.example](.env.example).
 
+## Adding songs
+
+Songs are processed in the background by a Celery worker. Start it next to the API
+(`--pool=solo` is required on Windows and runs one GPU job at a time):
+
+```bash
+uv run celery -A app.workers.celery_app worker --pool=solo --loglevel=info
+```
+
+Upload through the admin API (needs `ECHOSING_ADMIN_TOKEN` in `.env`):
+
+```bash
+curl -X POST http://127.0.0.1:8000/admin/songs \
+  -H "X-Admin-Token: $ECHOSING_ADMIN_TOKEN" \
+  -F "file=@song.mp3" -F "title=Song title" -F "artist=Artist" -F "language=es"
+```
+
+Or from the command line, without HTTP:
+
+```bash
+uv run python -m app.cli add-song song.mp3 --title "Song title" --artist "Artist" --language es
+```
+
+Accepted formats: mp3, m4a, wav, flac, ogg, up to `ECHOSING_MAX_UPLOAD_BYTES`
+(50 MB by default). Note that the web server receives the whole request before the
+limit is checked, so in production a reverse proxy (e.g. nginx
+`client_max_body_size`) must also cap the request size.
+
 ## Storage
 
 Audio files are stored through the `StorageBackend` protocol (`app/storage/`). The
