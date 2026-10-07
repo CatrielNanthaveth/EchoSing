@@ -34,6 +34,10 @@ class Settings(BaseSettings):
         roformer_model: audio-separator model file of the ``roformer`` preset.
         roformer_normalization: Peak amplitude audio-separator normalizes the
             input and output to.
+        whisper_model: Whisper model used to transcribe the isolated vocals.
+        transcription_timeout_s: Max seconds one transcription may take.
+        whisper_hallucination_silence_s: Silences longer than this (seconds)
+            around suspicious segments are skipped, reducing invented lyrics.
     """
 
     model_config = SettingsConfigDict(
@@ -56,6 +60,9 @@ class Settings(BaseSettings):
     demucs_shifts: int = Field(default=5, ge=1)
     roformer_model: str = "model_bs_roformer_ep_317_sdr_12.9755.ckpt"
     roformer_normalization: float = Field(default=0.9, gt=0, le=1)
+    whisper_model: str = "large-v3-turbo"
+    transcription_timeout_s: float = Field(default=900.0, gt=0)
+    whisper_hallucination_silence_s: float = Field(default=2.0, gt=0)
 
 
 @lru_cache

@@ -1,0 +1,58 @@
+{
+  "text": " Dame de tu vida y de tu tiempo. Suficientes para ver",
+  "language": "es",
+  "segments": [
+    {
+      "id": 1,
+      "seek": 3000,
+      "start": 26.5,
+      "end": 28.08,
+      "text": " Suficientes para ver",
+      "tokens": [50364, 2020, 1081],
+      "temperature": 0.0,
+      "avg_logprob": -0.21,
+      "compression_ratio": 1.1,
+      "no_speech_prob": 0.02,
+      "words": [
+        {"word": " Suficientes", "start": 26.5, "end": 27.1, "probability": 0.98},
+        {"word": " para", "start": 27.1, "end": 27.5, "probability": 0.99},
+        {"word": " ver", "start": 27.5, "end": 28.08, "probability": 1.0000001}
+      ]
+    },
+    {
+      "id": 0,
+      "seek": 0,
+      "start": 19.66,
+      "end": 21.46,
+      "text": " Dame de tu vida y de tu tiempo.",
+      "tokens": [50364, 26324, 368],
+      "temperature": 0.0,
+      "avg_logprob": -0.18,
+      "compression_ratio": 1.2,
+      "no_speech_prob": 0.01,
+      "words": [
+        {"word": " Dame", "start": 19.66, "end": 20.1, "probability": 0.95},
+        {"word": " de", "start": 20.1, "end": 20.1, "probability": 0.99},
+        {"word": " tu", "start": 20.05, "end": 20.42, "probability": 0.99},
+        {"word": " ", "start": 20.42, "end": 20.42, "probability": 0.5},
+        {"word": " vida", "start": 20.42, "end": 20.62, "probability": 0.97},
+        {"word": " y", "start": 20.62, "end": 20.72},
+        {"word": " de", "start": 20.72, "end": 20.84, "probability": 0.99},
+        {"word": " tu", "start": 20.84, "end": 20.94, "probability": 0.99},
+        {"word": " tiempo.", "start": 20.94, "end": 21.46, "probability": 0.99}
+      ]
+    },
+    {
+      "id": 2,
+      "seek": 6000,
+      "start": 60.0,
+      "end": 60.0,
+      "text": "",
+      "tokens": [],
+      "temperature": 0.2,
+      "avg_logprob": -1.5,
+      "compression_ratio": 0.0,
+      "no_speech_prob": 0.9
+    }
+  ]
+}

@@ -4,6 +4,7 @@ Usage (from ``backend/``)::
 
     uv run python -m app.cli add-song song.mp3 --title "Title" --artist "Artist"
     uv run python -m app.cli run-stage separate <song_id> [--separator roformer]
+    uv run python -m app.cli run-stage transcribe <song_id>
 
 ``run-stage`` runs a single ingestion stage synchronously, without Celery. It is
 meant for development and for re-processing one song by hand.
@@ -25,6 +26,10 @@ from app.core.config import Settings, get_settings
 from app.db.session import create_engine, create_session_factory
 from app.domain.enums import SeparationPreset
 from app.services.pipeline.separation import build_separation_stage
+from app.services.pipeline.transcription import (
+    TranscriptionResult,
+    build_transcription_stage,
+)
 from app.services.song_ingestion import (
     NewSong,
     SongIngestionService,
@@ -35,7 +40,7 @@ from app.storage.local import LocalStorage
 from app.workers.celery_app import celery_app
 from app.workers.queue import CeleryJobQueue
 
-STAGES = ("separate",)
+STAGES = ("separate", "transcribe")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -132,10 +137,44 @@ async def _run_stage(args: argparse.Namespace, settings: Settings) -> BaseModel:
     try:
         async with create_session_factory(engine)() as session:
             storage = LocalStorage(settings.storage_root)
-            stage = build_separation_stage(session, storage, settings)
-            return await stage.run(args.song_id, args.separator)
+            if args.stage == "transcribe":
+                transcription = build_transcription_stage(session, storage, settings)
+                return await transcription.run(args.song_id)
+            separation = build_separation_stage(session, storage, settings)
+            return await separation.run(args.song_id, args.separator)
     finally:
         await engine.dispose()
+
+
+def summarize(result: BaseModel) -> str:
+    """Render a stage result for the terminal.
+
+    Transcriptions can hold hundreds of words, so only the text and the first
+    word timings are shown; the full result is saved by the stage.
+
+    Args:
+        result: Result returned by a command.
+
+    Returns:
+        Text to print.
+    """
+    if not isinstance(result, TranscriptionResult):
+        return result.model_dump_json(indent=2)
+    transcription = result.transcription
+    first_words = ", ".join(
+        f"{word.text}@{word.start_ms / 1000:.2f}s" for word in transcription.words[:8]
+    )
+    return "\n".join(
+        [
+            f"model: {transcription.model} | language: {transcription.language}",
+            f"words: {len(transcription.words)} | saved to: {result.artifact_key}",
+            f"first words: {first_words}",
+            "discarded as hallucinations: "
+            + (" ".join(w.text for w in transcription.discarded) or "(none)"),
+            "text:",
+            transcription.text,
+        ]
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -147,7 +186,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     Returns:
         Process exit code.
     """
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.command == "run-stage" and args.separator and args.stage != "separate":
+        parser.error("--separator only applies to the 'separate' stage")
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     settings = get_settings()
 
@@ -161,7 +203,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = asyncio.run(_run_stage(args, settings))
         print(f"Stage '{args.stage}' took {time.perf_counter() - started:.1f}s")
 
-    print(result.model_dump_json(indent=2))
+    print(summarize(result))
     return 0
 
 

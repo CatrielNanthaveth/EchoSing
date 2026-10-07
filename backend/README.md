@@ -115,11 +115,28 @@ or to re-process a song; needs the `ml` group):
 ```bash
 uv run python -m app.cli run-stage separate <song_id>
 uv run python -m app.cli run-stage separate <song_id> --separator roformer  # switch preset
+uv run python -m app.cli run-stage transcribe <song_id>
 ```
 
 | Stage | Tool | Produces |
 |---|---|---|
 | `separate` | Separation preset (subprocess) + FFmpeg | `vocals.flac` (input for transcription and pitch), `instrumental.mp3` 192 kbps (streamed to clients), `songs.duration_ms` |
+| `transcribe` | Whisper `large-v3-turbo` CLI (subprocess) on `vocals.flac` | `work/transcription.json` (timed words; intermediate artifact, not an asset), `songs.language` if it was unknown |
+
+### Transcription
+
+Whisper runs with word timestamps, without conditioning on previous text (avoids
+repetition loops) and skipping hallucinations around long silences. The output is
+then cleaned up:
+
+- lyric order is preserved and word times are made strictly increasing;
+- words split at hyphens are merged (`cha` `-cha` -> `cha-cha`);
+- known hallucinated phrases (e.g. "Gracias por ver el video", "Amara.org") are
+  removed when isolated by 3 s of silence; they are kept under `discarded` in the
+  artifact for review.
+
+Reference on an RTX 5060: ~20–25 s per song with cached weights, ~5.2 GB of VRAM.
+The first run downloads the turbo weights (~1.5 GB).
 
 MP3 encoders prepend a short silence (~25 ms) that browsers may not trim; it is a
 constant offset absorbed by the client's latency calibration.

@@ -108,6 +108,23 @@ class SongRepository:
         await self._session.flush()
         return True
 
+    async def set_language(self, song_id: uuid.UUID, language: str) -> bool:
+        """Record the lyrics language of a song.
+
+        Args:
+            song_id: Id of the song.
+            language: Language code, e.g. ``es``.
+
+        Returns:
+            True if the song exists and was updated.
+        """
+        song = await self._session.get(Song, song_id)
+        if song is None:
+            return False
+        song.language = language
+        await self._session.flush()
+        return True
+
     async def set_separation_preset(
         self, song_id: uuid.UUID, preset: SeparationPreset
     ) -> bool:

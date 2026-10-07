@@ -103,10 +103,15 @@ EchoSing/
   `run-stage separate`. Presets por canción (`songs.separation_preset`): `demucs`
   (htdemucs, 5 shifts, ~35 s, ~1.1 GB VRAM, default) y `roformer` (BS-RoFormer Viperx
   1297 vía audio-separator, ~160–180 s, ~3 GB VRAM).
-- [ ] **US-2.3 Transcripción.** `Transcriber` → Whisper con timestamps por palabra.
+- [x] **US-2.3 Transcripción.** `Transcriber` → Whisper `large-v3-turbo` (subproceso) con
+  timestamps por palabra sobre `vocals.flac`; artefacto `work/transcription.json`;
+  completa `songs.language`. Limpieza: orden de la letra preservado, palabras con guion
+  unidas, alucinaciones conocidas aisladas descartadas (capa A). CLI
+  `run-stage transcribe`. ~20–25 s por canción, ~5.2 GB de VRAM.
 - [ ] **US-2.4 Segmentación en líneas.** Servicio puro (pausas, puntuación, largo máximo).
 - [ ] **US-2.5 F0 de referencia.** `PitchExtractor` → CREPE, curva por línea con máscara
-  de voicing.
+  de voicing. Incluye la **capa B anti-alucinaciones**: descartar palabras transcriptas
+  en tramos donde CREPE no detecta voz.
 - [ ] **US-2.6 Orquestación Celery.** Chain `separate → transcribe → segment → extract_f0 →
   persist`, con estados, manejo de errores y liberación de memoria.
 - [ ] **US-2.7 (opcional) Letras manuales** alineadas con los timestamps de Whisper.

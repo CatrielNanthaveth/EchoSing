@@ -21,6 +21,22 @@ def song_prefix(song_id: uuid.UUID) -> str:
     return f"songs/{song_id}/"
 
 
+def work_key(song_id: uuid.UUID, name: str) -> str:
+    """Return the key of an intermediate pipeline artifact of a song.
+
+    Intermediate artifacts (e.g. the raw transcription) are not assets: they
+    are kept so later stages can be re-run without repeating GPU work.
+
+    Args:
+        song_id: Id of the song.
+        name: File name, e.g. ``transcription.json``.
+
+    Returns:
+        A key such as ``songs/<song_id>/work/transcription.json``.
+    """
+    return f"{song_prefix(song_id)}work/{name}"
+
+
 def asset_key(song_id: uuid.UUID, kind: AssetKind, extension: str) -> str:
     """Return the storage key of a song asset.
 
