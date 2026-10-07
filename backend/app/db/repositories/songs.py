@@ -79,6 +79,23 @@ class SongRepository:
         await self._session.flush()
         return True
 
+    async def set_duration(self, song_id: uuid.UUID, duration_ms: int) -> bool:
+        """Record the duration of a song.
+
+        Args:
+            song_id: Id of the song.
+            duration_ms: Duration in milliseconds.
+
+        Returns:
+            True if the song exists and was updated.
+        """
+        song = await self._session.get(Song, song_id)
+        if song is None:
+            return False
+        song.duration_ms = duration_ms
+        await self._session.flush()
+        return True
+
     async def list_by_status(
         self, status: SongStatus, *, limit: int = 50, offset: int = 0
     ) -> Sequence[Song]:

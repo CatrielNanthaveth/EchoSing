@@ -98,7 +98,9 @@ EchoSing/
   `X-Admin-Token`) y comando CLI; crea la canción en estado PENDING y encola el job.
   Incluye la app Celery mínima y la interfaz `JobQueue` (adelantadas de US-2.6); la
   tarea `ingestion.run` es un placeholder hasta US-2.2–2.6.
-- [ ] **US-2.2 Separación de fuentes.** `SourceSeparator` → Demucs (vocals + instrumental).
+- [x] **US-2.2 Separación de fuentes.** `SourceSeparator` → Demucs en subproceso
+  (`vocals.flac` + `instrumental.mp3`), validación con `ffprobe` y `duration_ms`. CLI
+  `run-stage separate`. Medido: canción de 3:36 en ~34 s, ~1.1 GB de VRAM.
 - [ ] **US-2.3 Transcripción.** `Transcriber` → Whisper con timestamps por palabra.
 - [ ] **US-2.4 Segmentación en líneas.** Servicio puro (pausas, puntuación, largo máximo).
 - [ ] **US-2.5 F0 de referencia.** `PitchExtractor` → CREPE, curva por línea con máscara

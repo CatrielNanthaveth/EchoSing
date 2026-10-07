@@ -3,18 +3,27 @@
 Usage (from ``backend/``)::
 
     uv run python -m app.cli add-song song.mp3 --title "Title" --artist "Artist"
+    uv run python -m app.cli run-stage separate <song_id>
+
+``run-stage`` runs a single ingestion stage synchronously, without Celery. It is
+meant for development and for re-processing one song by hand.
 """
 
 import argparse
 import asyncio
+import logging
 import sys
+import time
+import uuid
 from collections.abc import AsyncIterator, Sequence
 from pathlib import Path
 
 import anyio
+from pydantic import BaseModel
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.db.session import create_engine, create_session_factory
+from app.services.pipeline.separation import build_separation_stage
 from app.services.song_ingestion import (
     NewSong,
     SongIngestionService,
@@ -25,6 +34,8 @@ from app.storage.local import LocalStorage
 from app.workers.celery_app import celery_app
 from app.workers.queue import CeleryJobQueue
 
+STAGES = ("separate",)
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the argument parser.
@@ -34,11 +45,18 @@ def build_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     commands = parser.add_subparsers(dest="command", required=True)
+
     add_song = commands.add_parser("add-song", help="Add a song and queue it")
     add_song.add_argument("path", type=Path, help="Audio file to upload")
     add_song.add_argument("--title", required=True)
     add_song.add_argument("--artist", required=True)
     add_song.add_argument("--language", help="ISO 639-1 code, e.g. 'es'")
+
+    run_stage = commands.add_parser(
+        "run-stage", help="Run one ingestion stage for a song, without Celery"
+    )
+    run_stage.add_argument("stage", choices=STAGES)
+    run_stage.add_argument("song_id", type=uuid.UUID)
     return parser
 
 
@@ -72,9 +90,8 @@ async def register_file(
     return await service.register_song(song, path.name, read_file_chunks(path))
 
 
-async def _add_song(args: argparse.Namespace) -> SongRegistration:
+async def _add_song(args: argparse.Namespace, settings: Settings) -> BaseModel:
     """Wire the real dependencies and register the song."""
-    settings = get_settings()
     engine = create_engine(settings.database_url)
     try:
         async with create_session_factory(engine)() as session:
@@ -90,6 +107,18 @@ async def _add_song(args: argparse.Namespace) -> SongRegistration:
         await engine.dispose()
 
 
+async def _run_stage(args: argparse.Namespace, settings: Settings) -> BaseModel:
+    """Wire the real dependencies and run one ingestion stage."""
+    engine = create_engine(settings.database_url)
+    try:
+        async with create_session_factory(engine)() as session:
+            storage = LocalStorage(settings.storage_root)
+            stage = build_separation_stage(session, storage, settings)
+            return await stage.run(args.song_id)
+    finally:
+        await engine.dispose()
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command line.
 
@@ -100,11 +129,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         Process exit code.
     """
     args = build_parser().parse_args(argv)
-    if not args.path.is_file():
-        print(f"File not found: {args.path}", file=sys.stderr)
-        return 1
-    registration = asyncio.run(_add_song(args))
-    print(registration.model_dump_json(indent=2))
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    settings = get_settings()
+
+    if args.command == "add-song":
+        if not args.path.is_file():
+            print(f"File not found: {args.path}", file=sys.stderr)
+            return 1
+        result = asyncio.run(_add_song(args, settings))
+    else:
+        started = time.perf_counter()
+        result = asyncio.run(_run_stage(args, settings))
+        print(f"Stage '{args.stage}' took {time.perf_counter() - started:.1f}s")
+
+    print(result.model_dump_json(indent=2))
     return 0
 
 

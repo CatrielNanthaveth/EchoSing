@@ -45,6 +45,30 @@ class SongAssetRepository:
         await self._session.flush()
         return asset
 
+    async def upsert(
+        self, song_id: uuid.UUID, kind: AssetKind, stored: StoredObject
+    ) -> SongAsset:
+        """Register a stored file, replacing the song's asset of the same kind.
+
+        Used when (re)processing a song regenerates its stems.
+
+        Args:
+            song_id: Id of the song.
+            kind: Kind of asset.
+            stored: Metadata returned by the storage backend.
+
+        Returns:
+            The created or updated asset.
+        """
+        asset = await self.get(song_id, kind)
+        if asset is None:
+            return await self.add(song_id, kind, stored)
+        asset.storage_key = stored.key
+        asset.content_type = stored.content_type
+        asset.size_bytes = stored.size_bytes
+        await self._session.flush()
+        return asset
+
     async def get(self, song_id: uuid.UUID, kind: AssetKind) -> SongAsset | None:
         """Fetch the asset of a given kind for a song.
 

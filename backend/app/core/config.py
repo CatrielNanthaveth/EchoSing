@@ -22,6 +22,9 @@ class Settings(BaseSettings):
         admin_token: Shared secret required in ``X-Admin-Token`` by admin
             endpoints. When unset, admin endpoints are disabled.
         max_upload_bytes: Max size of an uploaded song file.
+        ml_device: Torch device for ML models (``cuda`` or ``cpu``).
+        separator_model: Demucs model used for source separation.
+        separation_timeout_s: Max seconds Demucs may take for one song.
     """
 
     model_config = SettingsConfigDict(
@@ -36,6 +39,9 @@ class Settings(BaseSettings):
     storage_root: Path = Path("storage")
     admin_token: SecretStr | None = None
     max_upload_bytes: int = Field(default=50 * 1024 * 1024, gt=0)
+    ml_device: str = "cuda"
+    separator_model: str = "htdemucs"
+    separation_timeout_s: float = Field(default=900.0, gt=0)
 
 
 @lru_cache

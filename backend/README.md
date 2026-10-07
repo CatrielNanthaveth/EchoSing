@@ -103,6 +103,25 @@ Accepted formats: mp3, m4a, wav, flac, ogg, up to `ECHOSING_MAX_UPLOAD_BYTES`
 limit is checked, so in production a reverse proxy (e.g. nginx
 `client_max_body_size`) must also cap the request size.
 
+## Running ingestion stages by hand
+
+Each pipeline stage can be run for one song without Celery (useful while developing
+or to re-process a song; needs the `ml` group):
+
+```bash
+uv run python -m app.cli run-stage separate <song_id>
+```
+
+| Stage | Tool | Produces |
+|---|---|---|
+| `separate` | Demucs (`htdemucs`, subprocess) + FFmpeg | `vocals.flac` (input for transcription and pitch), `instrumental.mp3` 192 kbps (streamed to clients), `songs.duration_ms` |
+
+Reference run on an RTX 5060 (8 GB): a 3:36 song separates in ~34 s using ~1.1 GB of
+VRAM, fully released when the subprocess exits.
+
+MP3 encoders prepend a short silence (~25 ms) that browsers may not trim; it is a
+constant offset absorbed by the client's latency calibration.
+
 ## Storage
 
 Audio files are stored through the `StorageBackend` protocol (`app/storage/`). The

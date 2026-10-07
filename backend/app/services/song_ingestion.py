@@ -149,9 +149,12 @@ class SongIngestionService:
         content: AsyncIterable[bytes],
     ) -> tuple[Song, IngestionJob]:
         """Create the song, store its file and create its job in one commit."""
-        record: Song | None = None
+        # Keep the id in a plain variable: ORM instances may be expired by the
+        # rollback below, and reading their attributes would then hit the DB.
+        song_id: uuid.UUID | None = None
         try:
             record = await self._songs.add(song.title, song.artist, song.language)
+            song_id = record.id
             stored = await self._storage.save(
                 asset_key(record.id, AssetKind.ORIGINAL, extension),
                 self._limit_size(content),
@@ -162,8 +165,8 @@ class SongIngestionService:
             await self._session.commit()
         except BaseException:
             await self._session.rollback()
-            if record is not None:
-                await self._storage.delete_prefix(song_prefix(record.id))
+            if song_id is not None:
+                await self._storage.delete_prefix(song_prefix(song_id))
             raise
         return record, job
 
