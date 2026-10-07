@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 import pytest
 from sqlalchemy import func, select
@@ -15,6 +16,7 @@ from app.domain.enums import (
     PlaySessionStatus,
     SongStatus,
 )
+from app.schemas.analysis import FORMAT_VERSION, parse_analysis
 
 pytestmark = pytest.mark.integration
 
@@ -99,6 +101,23 @@ async def test_add_version_increments_and_switches_current(
     assert current.id == v2.id
     # The already-loaded v1 instance must be in sync without a refresh.
     assert v1.is_current is False
+
+
+async def test_analysis_format_roundtrip_through_jsonb(
+    db_session: AsyncSession, analysis_json: dict[str, Any]
+) -> None:
+    analysis = parse_analysis(FORMAT_VERSION, analysis_json)
+    song = await SongRepository(db_session).add("Song", "Artist")
+    repo = SongAnalysisRepository(db_session)
+
+    stored = await repo.add_version(
+        song.id, FORMAT_VERSION, analysis.model_dump(mode="json")
+    )
+    db_session.expunge(stored)  # force a real read from PostgreSQL
+
+    current = await repo.get_current(song.id)
+    assert current is not None
+    assert parse_analysis(current.format_version, current.data) == analysis
 
 
 async def test_get_current_without_analysis_returns_none(

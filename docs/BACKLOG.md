@@ -88,8 +88,9 @@ EchoSing/
   `ingestion_jobs`, `play_sessions` (referencia el `analysis_id` jugado), `line_scores`.
   *AC:* la migración inicial aplica y revierte; repositorios async testeados.
 - [x] **US-1.2 Abstracción de storage.** `StorageBackend` (Protocol) + `LocalStorage` async.
-- [ ] **US-1.3 Formato de análisis.** Esquemas Pydantic `SongAnalysis`, `LyricLine`, `Word`,
-  `PitchCurve` + `docs/analysis-format.md`.
+- [x] **US-1.3 Formato de análisis.** Esquemas Pydantic `SongAnalysisData`, `LyricLine`,
+  `Word`, `PitchCurve` (MIDI + confianza 0–100, curva global) +
+  [analysis-format.md](analysis-format.md).
 
 ## E2 — Pipeline de ingesta
 
