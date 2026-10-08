@@ -17,6 +17,22 @@ cp .env.example .env   # optional: VITE_API_URL (default http://localhost:8000)
 npm run dev            # http://localhost:5173
 ```
 
+## Playing
+
+1. **Calibrate** once per headphones/speakers (`/calibrar`): clap along with 8 beeps;
+   the measured latency (output + input) is stored in the browser.
+2. Pick a song and press **Cantar**: this creates a play session, opens the
+   microphone and plays the instrumental. Use headphones, so the microphone does not
+   pick up the track.
+3. Each line is scored when it ends (score, verdict and streak); when the song ends
+   the session is finished and its results open (`/sessions/{id}/results`).
+
+How it works: the instrumental is decoded and played with Web Audio, and the
+microphone is analyzed in an AudioWorklet (YIN, a frame every ~10.7 ms) on the same
+`AudioContext` clock, so every pitch frame is placed exactly on the song timeline.
+Frames are grouped by lyric line and sent over the WebSocket (`docs/ws-protocol.md`);
+the server compensates the latency and scores with DTW.
+
 ## Commands
 
 | Command              | Does                                                |

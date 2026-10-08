@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { Link, useParams } from "react-router";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router";
 
 import { ApiError, api } from "../api/client";
-import type { SessionSummaryMessage, SongDetail } from "../api/types";
+import type { SongDetail } from "../api/types";
 import { LyricsView } from "../components/LyricsView";
 import { PitchMeter } from "../components/PitchMeter";
 import { ScoreCard } from "../components/ScoreCard";
@@ -46,6 +46,12 @@ function Karaoke({ song }: { song: SongDetail }) {
   const session = usePlaySession(song);
   const karaoke = useKaraoke(song, session.sendLine, () => void session.finish());
   const { phase } = karaoke;
+  const navigate = useNavigate();
+  const finishedId = session.state.name === "finished" ? session.state.sessionId : null;
+
+  useEffect(() => {
+    if (finishedId !== null) void navigate(`/sessions/${finishedId}/results`);
+  }, [finishedId, navigate]);
 
   const sing = async () => {
     const name = normalizePlayerName(playerName);
@@ -124,11 +130,7 @@ function Karaoke({ song }: { song: SongDetail }) {
             disabled={busy}
             onClick={() => void sing()}
           >
-            {busy
-              ? "Preparando…"
-              : session.state.name === "finished"
-                ? "Cantar de nuevo"
-                : "Cantar"}
+            {busy ? "Preparando…" : "Cantar"}
           </button>
         )}
       </div>
@@ -155,9 +157,6 @@ function Karaoke({ song }: { song: SongDetail }) {
           Calculando el resultado…
         </p>
       )}
-      {session.state.name === "finished" && (
-        <FinalScore summary={session.state.summary} />
-      )}
 
       {error !== null && (
         <p role="alert" className="error-box">
@@ -165,19 +164,5 @@ function Karaoke({ song }: { song: SongDetail }) {
         </p>
       )}
     </section>
-  );
-}
-
-function FinalScore({ summary }: { summary: SessionSummaryMessage }) {
-  return (
-    <div className="final-score" role="status" aria-label="Resultado final">
-      <p className="final-score-value">
-        {summary.total_score === null ? "–" : Math.round(summary.total_score)}
-      </p>
-      <p className="muted">
-        {summary.hit_lines} de {summary.scored_lines} versos acertados · mejor racha{" "}
-        {summary.best_streak}
-      </p>
-    </div>
   );
 }

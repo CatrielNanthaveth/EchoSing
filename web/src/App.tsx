@@ -3,6 +3,7 @@ import { Link, NavLink, Route, Routes } from "react-router";
 import { CalibrationPage } from "./pages/CalibrationPage";
 import { CatalogPage } from "./pages/CatalogPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
+import { ResultsPage } from "./pages/ResultsPage";
 import { SongPage } from "./pages/SongPage";
 
 export function App() {
@@ -20,6 +21,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<CatalogPage />} />
           <Route path="/songs/:songId" element={<SongPage />} />
+          <Route path="/sessions/:sessionId/results" element={<ResultsPage />} />
           <Route path="/calibrar" element={<CalibrationPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

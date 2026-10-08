@@ -86,6 +86,10 @@ function renderSong() {
     <MemoryRouter initialEntries={["/songs/song-1"]}>
       <Routes>
         <Route path="/songs/:songId" element={<SongPage />} />
+        <Route
+          path="/sessions/:sessionId/results"
+          element={<p>Resultados de la sesión</p>}
+        />
       </Routes>
     </MemoryRouter>,
   );
@@ -200,7 +204,7 @@ describe("SongPage", () => {
     );
   });
 
-  it("finishes the session when the song ends and shows the final score", async () => {
+  it("finishes the session when the song ends and opens its results", async () => {
     const { socket } = await startSinging();
 
     act(() => {
@@ -208,16 +212,14 @@ describe("SongPage", () => {
     });
     expect(socket.sent.at(-1)).toEqual({ type: "finish" });
     expect(screen.getByText("Calculando el resultado…")).toBeVisible();
+    expect(listeners.size).toBe(0);
 
     act(() => {
       socket.receive(SUMMARY_MESSAGE);
     });
 
-    const result = await screen.findByRole("status", { name: "Resultado final" });
-    expect(result).toHaveTextContent("88");
-    expect(result).toHaveTextContent("2 de 3 versos acertados · mejor racha 3");
-    expect(screen.getByRole("button", { name: "Cantar de nuevo" })).toBeVisible();
-    expect(listeners.size).toBe(0);
+    expect(await screen.findByText("Resultados de la sesión")).toBeVisible();
+    expect(closeMicrophone).toHaveBeenCalled();
   });
 
   it("abandons the session when the player stops", async () => {
