@@ -248,3 +248,38 @@ def test_singing_past_the_line_end_is_ignored() -> None:
     result = score_line(reference_curve(), to_hz(np.concatenate((MELODY, tail))), HOP)
 
     assert result.score == 100.0
+
+
+# Rap-like line: short sung bursts separated by pauses (50% unvoiced).
+PAUSED_MIDI = np.repeat([50.0, 51.0, 49.0, 52.0, 50.0, 48.0, 51.0, 50.0], 30)
+PAUSED_CONFIDENCE = np.tile(np.r_[np.full(30, 0.95), np.full(30, 0.05)], 4)
+PAUSED_SUNG = np.where(PAUSED_CONFIDENCE >= 0.5, PAUSED_MIDI, np.nan)
+
+
+def test_lines_with_many_pauses_keep_their_timing() -> None:
+    # Comparing only the voiced reference frames against the full sung curve
+    # compressed the reference in time and broke the alignment.
+    reference = reference_curve(PAUSED_MIDI, PAUSED_CONFIDENCE)
+
+    result = score_line(reference, to_hz(PAUSED_SUNG), HOP)
+
+    assert result.score == 100.0
+    assert result.accuracy == 1.0
+
+
+def test_detuned_singing_with_pauses_gets_partial_credit() -> None:
+    reference = reference_curve(PAUSED_MIDI, PAUSED_CONFIDENCE)
+
+    result = score_line(reference, to_hz(PAUSED_SUNG - 1.0), HOP)
+
+    assert result.score == pytest.approx(66.67, abs=0.01)
+
+
+@pytest.mark.parametrize("shift_frames", [-15, 15])
+def test_shifted_singing_with_pauses_is_barely_penalized(shift_frames: int) -> None:
+    reference = reference_curve(PAUSED_MIDI, PAUSED_CONFIDENCE)
+    shifted = np.roll(PAUSED_SUNG, shift_frames)  # 150 ms early or late
+
+    result = score_line(reference, to_hz(shifted), HOP)
+
+    assert result.score is not None and result.score > 90

@@ -143,7 +143,7 @@ def score_line(
     # Both curves start at the line start; once the latency is undone, singing
     # past the end of the line is dropped so both cover the same time span.
     sung = sung[: reference_midi.size]
-    errors = _frame_errors(reference_midi[voiced], sung, settings)
+    errors = _frame_errors(reference_midi, sung, settings)[voiced]
 
     credit = np.clip(
         (settings.zero_credit_semitones - errors)
@@ -167,7 +167,12 @@ def score_line(
 def _frame_errors(
     reference: FloatArray, sung: FloatArray, config: ScoringConfig
 ) -> FloatArray:
-    """Pitch error of each sung reference frame after DTW alignment."""
+    """Pitch error of each reference frame after DTW alignment.
+
+    The whole reference timeline is aligned, pauses included, so both curves
+    keep the same time scale and the warp limit is measured in real time.
+    Unvoiced reference frames cost nothing; callers keep only voiced frames.
+    """
     if sung.size == 0 or np.isnan(sung).all():
         return np.full(reference.size, config.max_error_semitones)
     cost = semitone_error(
@@ -179,6 +184,7 @@ def _frame_errors(
         config.max_error_semitones,
         np.minimum(cost, config.max_error_semitones),
     )
+    cost[np.isnan(reference)] = 0.0
     band_ratio = (
         None
         if config.max_warp_ms is None
