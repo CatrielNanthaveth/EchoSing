@@ -121,6 +121,7 @@ export function lineDiagnostics(
       full_credit_semitones: 0.75,
       zero_credit_semitones: 2.5,
       max_error_semitones: 6,
+      max_gap_ms: 100,
       octave_invariant: true,
       max_warp_ms: 200,
       step_penalty_semitones: 2,

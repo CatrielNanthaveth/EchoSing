@@ -17,6 +17,7 @@ export type SessionTotals = Schemas["SessionTotals"];
 export type LineReport = Schemas["LineReport"];
 export type LinePractice = Schemas["LinePractice"];
 export type LineAnalysis = Schemas["LineAnalysis"];
+export type LineAttempt = Schemas["LineAttempt"];
 export type PracticeWord = Schemas["PracticeWord"];
 export type LineDiagnostics = Schemas["LineDiagnostics"];
 export type WordDiagnostics = Schemas["WordDiagnostics"];

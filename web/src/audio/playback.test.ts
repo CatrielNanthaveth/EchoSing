@@ -81,4 +81,15 @@ describe("Playback", () => {
     expect(sources[0]?.disconnect).toHaveBeenCalled();
     expect(player.playing).toBe(false);
   });
+
+  it("plays a segment and keeps song times right", () => {
+    const { context, sources, player } = playback();
+
+    player.start(undefined, { fromMs: 30_000, durationMs: 5000 });
+
+    expect(sources[0]?.start).toHaveBeenCalledWith(10.1, 30, 5);
+    context.currentTime = 11.1; // 1 s into the segment
+    expect(player.positionMs()).toBeCloseTo(31_000);
+    expect(player.songTimeAt(12.1)).toBeCloseTo(32_000);
+  });
 });

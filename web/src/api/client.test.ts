@@ -98,6 +98,26 @@ describe("ApiClient", () => {
     });
   });
 
+  it("posts practice attempts", async () => {
+    const { client, fetchMock } = clientReturning(jsonResponse({}));
+    const attempt = {
+      analysis_id: "a1",
+      hop_ms: 10,
+      f0_hz: [0, 220],
+      latency_offset_ms: 50,
+      difficulty: "easy" as const,
+    };
+
+    await client.scoreAttempt("s1", 4, attempt);
+
+    expect(requestedUrls(fetchMock)).toEqual([
+      "http://api.test/songs/s1/lines/4/attempt",
+    ]);
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(init?.body as string)).toEqual(attempt);
+  });
+
   it("sends the admin token for diagnostics", async () => {
     const { client, fetchMock } = clientReturning(jsonResponse({}));
 

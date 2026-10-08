@@ -32,11 +32,12 @@ export class Playback {
   }
 
   /**
-   * Play from the beginning.
+   * Play the track, from the beginning or a segment of it.
    *
-   * @param onEnded Called when the track finishes on its own (not on stop()).
+   * @param onEnded Called when playback finishes on its own (not on stop()).
+   * @param segment Song time to start at and how long to play (ms).
    */
-  start(onEnded?: () => void): void {
+  start(onEnded?: () => void, segment?: { fromMs: number; durationMs: number }): void {
     this.stop();
     const source = this.#context.createBufferSource();
     source.buffer = this.#buffer;
@@ -46,8 +47,12 @@ export class Playback {
       this.#source = null;
       onEnded?.();
     };
-    this.#startedAt = this.#context.currentTime + START_LEAD_S;
-    source.start(this.#startedAt);
+    const when = this.#context.currentTime + START_LEAD_S;
+    const fromS = Math.max(0, (segment?.fromMs ?? 0) / 1000);
+    // Song time 0 "would have played" fromS before the segment starts.
+    this.#startedAt = when - fromS;
+    if (segment === undefined) source.start(when);
+    else source.start(when, fromS, Math.max(0, segment.durationMs / 1000));
     this.#source = source;
   }
 

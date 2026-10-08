@@ -1,4 +1,6 @@
 import type {
+  LineAnalysis,
+  LineAttempt,
   LineDiagnostics,
   LinePractice,
   PitchResponse,
@@ -95,6 +97,24 @@ export class ApiClient {
     return this.#request(
       `/admin/sessions/${encodeURIComponent(sessionId)}/lines/${String(lineIndex)}/debug`,
       { signal: signal ?? null, headers: { "X-Admin-Token": adminToken } },
+    );
+  }
+
+  /** Live practice: score one attempt at a line (nothing is stored). */
+  scoreAttempt(
+    songId: string,
+    lineIndex: number,
+    attempt: LineAttempt,
+    signal?: AbortSignal,
+  ): Promise<LineAnalysis> {
+    return this.#request(
+      `/songs/${encodeURIComponent(songId)}/lines/${String(lineIndex)}/attempt`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(attempt),
+        signal: signal ?? null,
+      },
     );
   }
 

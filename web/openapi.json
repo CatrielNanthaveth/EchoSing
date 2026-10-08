@@ -220,6 +220,72 @@
         }
       }
     },
+    "/songs/{song_id}/lines/{line_index}/attempt": {
+      "post": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Score Line Attempt",
+        "description": "Score a practice attempt at one line (live practice); nothing is stored.",
+        "operationId": "score_line_attempt_songs__song_id__lines__line_index__attempt_post",
+        "parameters": [
+          {
+            "name": "song_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Song Id"
+            }
+          },
+          {
+            "name": "line_index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Line Index"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LineAttempt"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LineAnalysis"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Song, analysis or line not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/songs/{song_id}/pitch": {
       "get": {
         "tags": [
@@ -1057,6 +1123,50 @@
         "title": "LineAnalysis",
         "description": "A sung line explained frame by frame, on the scoring timeline.\n\nEvery list has one value per scoring frame from the line start; None marks\nframes without voice (or without a value).\n\nAttributes:\n    result: The line score, identical to ``score_line``.\n    hop_ms: Time between frames.\n    reference_midi: Reference pitch.\n    reference_weight: Confidence weight of each reference frame (0-1).\n    sung_midi: What was sung at each moment (latency undone), shifted by\n        whole octaves to the reference's register (``octave_shift``).\n    aligned_midi: For each sung reference frame, the sung pitch DTW\n        matched to it, in the reference's octave: what was scored.\n    credit: Credit (0-1) of each sung reference frame.\n    alignment_path: Pairs ``[reference_frame, sung_frame]`` of the\n        alignment path.\n    octave_shift: Whole octaves (in semitones) removed from ``sung_midi``,\n        e.g. -12 when the line was sung an octave lower.\n    timing_offset_ms: Median delay of the matched sung frames (positive:\n        sung late), None if nothing was matched.\n    pitch_offset_semitones: Median pitch error with sign (positive: sharp),\n        None if nothing was matched."
       },
+      "LineAttempt": {
+        "properties": {
+          "analysis_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Analysis Id"
+          },
+          "hop_ms": {
+            "type": "number",
+            "maximum": 50.0,
+            "minimum": 5.0,
+            "title": "Hop Ms"
+          },
+          "f0_hz": {
+            "items": {
+              "type": "number",
+              "maximum": 5000.0,
+              "minimum": 0.0
+            },
+            "type": "array",
+            "maxItems": 6000,
+            "title": "F0 Hz"
+          },
+          "latency_offset_ms": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": -500.0,
+            "title": "Latency Offset Ms",
+            "default": 0
+          },
+          "difficulty": {
+            "$ref": "#/components/schemas/Difficulty",
+            "default": "normal"
+          }
+        },
+        "type": "object",
+        "required": [
+          "analysis_id",
+          "hop_ms",
+          "f0_hz"
+        ],
+        "title": "LineAttempt",
+        "description": "A practice attempt at one line, scored but not stored.\n\nAttributes:\n    analysis_id: Analysis whose lines and pitch the client is using.\n    hop_ms: Time between pitch frames.\n    f0_hz: Pitch per frame in Hz from the line start (0 = no voice), as in\n        the ``line_pitch`` message (send ~300 ms past the line end).\n    latency_offset_ms: Latency measured by the client's calibration.\n    difficulty: Pitch tolerance."
+      },
       "LineDiagnostics": {
         "properties": {
           "session_id": {
@@ -1632,6 +1742,12 @@
             "title": "Max Error Semitones",
             "default": 6.0
           },
+          "max_gap_ms": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Max Gap Ms",
+            "default": 100.0
+          },
           "octave_invariant": {
             "type": "boolean",
             "title": "Octave Invariant",
@@ -1666,7 +1782,7 @@
         },
         "type": "object",
         "title": "ScoringConfig",
-        "description": "Tunable parameters of line scoring.\n\nAttributes:\n    scoring_hop_ms: Frame period used to compare curves. Notes last at\n        least ~100 ms, so 20 ms loses nothing for intonation and keeps DTW\n        fast enough for real-time feedback.\n    min_reference_confidence: Reference frames below this confidence\n        (0-100) are not sung and not scored.\n    min_voiced_ms: Lines with less sung reference than this (e.g. spoken\n        passages) are not scorable.\n    full_credit_semitones: Errors up to this get full credit (0.5 = 50\n        cents, a quarter tone).\n    zero_credit_semitones: Errors from this up get no credit; credit\n        decreases linearly in between.\n    max_error_semitones: Cap of the frame error; also the cost of a sung\n        frame without voice.\n    octave_invariant: Whether singing an octave above or below is right.\n    max_warp_ms: How far (in time) the alignment may drift from the\n        diagonal: enough to enter late or hold a note, not enough to match\n        a neighboring note (None for no limit).\n    step_penalty_semitones: Cost of each non-diagonal alignment step. It\n        stops DTW from \"rewarding\" off-key singing by matching it to other\n        reference notes of the same height (without it, singing 1.5\n        semitones off scores 58 instead of 33). 2.0 gives the theoretical\n        scores for detuned singing while keeping late entries (150 ms ->\n        100) and rhythm variations (+-100 ms -> ~97) almost unpenalized.\n    hit_threshold: Line score from which the line counts as a hit."
+        "description": "Tunable parameters of line scoring.\n\nAttributes:\n    scoring_hop_ms: Frame period used to compare curves. Notes last at\n        least ~100 ms, so 20 ms loses nothing for intonation and keeps DTW\n        fast enough for real-time feedback.\n    min_reference_confidence: Reference frames below this confidence\n        (0-100) are not sung and not scored.\n    min_voiced_ms: Lines with less sung reference than this (e.g. spoken\n        passages) are not scorable.\n    full_credit_semitones: Errors up to this get full credit (0.5 = 50\n        cents, a quarter tone).\n    zero_credit_semitones: Errors from this up get no credit; credit\n        decreases linearly in between.\n    max_error_semitones: Cap of the frame error; also the cost of a sung\n        frame without voice.\n    max_gap_ms: Unvoiced gaps of the sung curve up to this long, between\n        voiced frames, are bridged before scoring: real-time detection\n        drops frames inside notes, while the reference is smoothed.\n    octave_invariant: Whether singing an octave above or below is right.\n    max_warp_ms: How far (in time) the alignment may drift from the\n        diagonal: enough to enter late or hold a note, not enough to match\n        a neighboring note (None for no limit).\n    step_penalty_semitones: Cost of each non-diagonal alignment step. It\n        stops DTW from \"rewarding\" off-key singing by matching it to other\n        reference notes of the same height (without it, singing 1.5\n        semitones off scores 58 instead of 33). 2.0 gives the theoretical\n        scores for detuned singing while keeping late entries (150 ms ->\n        100) and rhythm variations (+-100 ms -> ~97) almost unpenalized.\n    hit_threshold: Line score from which the line counts as a hit."
       },
       "SeparationPreset": {
         "type": "string",

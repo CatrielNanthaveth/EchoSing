@@ -86,6 +86,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/songs/{song_id}/lines/{line_index}/attempt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Score Line Attempt
+         * @description Score a practice attempt at one line (live practice); nothing is stored.
+         */
+        post: operations["score_line_attempt_songs__song_id__lines__line_index__attempt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/songs/{song_id}/pitch": {
         parameters: {
             query?: never;
@@ -398,6 +418,36 @@ export interface components {
             pitch_offset_semitones: number | null;
         };
         /**
+         * LineAttempt
+         * @description A practice attempt at one line, scored but not stored.
+         *
+         *     Attributes:
+         *         analysis_id: Analysis whose lines and pitch the client is using.
+         *         hop_ms: Time between pitch frames.
+         *         f0_hz: Pitch per frame in Hz from the line start (0 = no voice), as in
+         *             the ``line_pitch`` message (send ~300 ms past the line end).
+         *         latency_offset_ms: Latency measured by the client's calibration.
+         *         difficulty: Pitch tolerance.
+         */
+        LineAttempt: {
+            /**
+             * Analysis Id
+             * Format: uuid
+             */
+            analysis_id: string;
+            /** Hop Ms */
+            hop_ms: number;
+            /** F0 Hz */
+            f0_hz: number[];
+            /**
+             * Latency Offset Ms
+             * @default 0
+             */
+            latency_offset_ms: number;
+            /** @default normal */
+            difficulty: components["schemas"]["Difficulty"];
+        };
+        /**
          * LineDiagnostics
          * @description Everything behind a line score, for admins debugging sync and scoring.
          *
@@ -700,6 +750,9 @@ export interface components {
          *             decreases linearly in between.
          *         max_error_semitones: Cap of the frame error; also the cost of a sung
          *             frame without voice.
+         *         max_gap_ms: Unvoiced gaps of the sung curve up to this long, between
+         *             voiced frames, are bridged before scoring: real-time detection
+         *             drops frames inside notes, while the reference is smoothed.
          *         octave_invariant: Whether singing an octave above or below is right.
          *         max_warp_ms: How far (in time) the alignment may drift from the
          *             diagonal: enough to enter late or hold a note, not enough to match
@@ -743,6 +796,11 @@ export interface components {
              * @default 6
              */
             max_error_semitones: number;
+            /**
+             * Max Gap Ms
+             * @default 100
+             */
+            max_gap_ms: number;
             /**
              * Octave Invariant
              * @default true
@@ -1441,6 +1499,49 @@ export interface operations {
             };
             /** @description Range out of file */
             416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    score_line_attempt_songs__song_id__lines__line_index__attempt_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                song_id: string;
+                line_index: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LineAttempt"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LineAnalysis"];
+                };
+            };
+            /** @description Song, analysis or line not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
