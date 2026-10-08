@@ -269,6 +269,32 @@ evaluated: ~2x faster but ~5.5 GB of VRAM.
 Known limitation of every separator: high-pitched vocals share frequencies with
 instrument overtones, so the instrumental can sound duller where they were removed.
 
+## Scoring engine
+
+`app/scoring/` holds pure numpy functions (no I/O) that compare a sung line with its
+reference pitch:
+
+1. the singer's pitch (Hz) is converted to MIDI, the measured latency is undone and
+   both curves are resampled to 20 ms frames;
+2. a cost matrix of octave-invariant semitone errors is aligned with **DTW**
+   (vectorized per anti-diagonal), limited to 200 ms of drift and with a penalty on
+   non-diagonal steps, so late entries and rhythm variations are tolerated but
+   off-key singing cannot "borrow" neighboring notes;
+3. each sung reference frame gets full credit within 0.5 semitone, decreasing to none
+   at 2 semitones; the line score (0-100) is weighted by the reference confidence;
+4. session totals weigh lines by length; the best streak counts consecutive hits
+   (score >= 60).
+
+Every threshold lives in `ScoringConfig`. Reference behavior: exact or octave-shifted
+singing 100, 1 semitone off ~67, 150 ms late 100, random notes ~35. An 8 s line is
+scored in ~16 ms.
+
+The scoring package must keep 100% test coverage:
+
+```bash
+uv run pytest tests/unit/scoring --cov=app.scoring --cov-fail-under=100
+```
+
 ## Storage
 
 Audio files are stored through the `StorageBackend` protocol (`app/storage/`). The

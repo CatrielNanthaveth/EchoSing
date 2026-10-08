@@ -150,12 +150,17 @@ Una canción es *jugable* si tiene análisis actual e instrumental, sin importar
 
 ## E4 — Motor de scoring (100 % de cobertura)
 
-- [ ] **US-4.1 Utilidades de pitch.** Hz → cents/MIDI, unvoiced, resampleo, plegado de octava.
-- [ ] **US-4.2 DTW vectorizado.** Anti-diagonales en numpy, banda Sakoe-Chiba, costo + path.
-  *Edge cases:* largos distintos, vacíos, match perfecto, mismatch total, todo unvoiced,
-  una sola muestra.
-- [ ] **US-4.3 Puntaje 0–100 por línea** con tolerancia en cents; hit/miss para rachas.
-- [ ] **US-4.4 Agregado de sesión.** Precisión global, mejor racha, puntaje total.
+- [x] **US-4.1 Utilidades de pitch.** Hz → MIDI, remuestreo sin puentear silencios,
+  compensación de latencia, error en semitonos invariante a octavas.
+- [x] **US-4.2 DTW vectorizado.** Anti-diagonales en layout sesgado (vistas `as_strided`,
+  buffers reutilizados), máscara del camino óptimo con pasada ida + vuelta (sin
+  backtracking), banda Sakoe-Chiba con camino garantizado y penalización de pasos no
+  diagonales. Verificado contra implementación ingenua.
+- [x] **US-4.3 Puntaje 0–100 por línea.** Scoring a 20 ms, desvío máximo 200 ms,
+  crédito completo ≤ 0.5 st y nulo ≥ 2 st, ponderado por confianza de CREPE; versos
+  con < 200 ms de canto no puntúan. Calibrado con escenarios musicales.
+- [x] **US-4.4 Agregado de sesión.** Puntaje y precisión ponderados por largo del
+  verso, mejor racha (los versos no puntuables no la cortan).
 
 ## E5 — Sesión en tiempo real
 
