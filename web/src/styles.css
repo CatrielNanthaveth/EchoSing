@@ -753,3 +753,54 @@ a.button.primary {
 .mic-test-results .admin-table {
   margin: 0.5rem 0 1rem;
 }
+
+/* Live practice */
+
+.karaoke-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.practice-line-text {
+  margin-top: 0;
+  font-size: 1.4rem;
+}
+
+.live-pitch {
+  display: block;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.live-legend {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+}
+
+.live-legend .chart-swatch {
+  margin-left: 0.75rem;
+}
+
+.practice-status {
+  min-height: 1.5rem;
+  text-align: center;
+}
+
+.practice-history {
+  font-variant-numeric: tabular-nums;
+}
+
+.practice-attempt {
+  display: inline-block;
+  margin-right: 0.4rem;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.practice-attempt:last-child {
+  border-color: var(--accent);
+}

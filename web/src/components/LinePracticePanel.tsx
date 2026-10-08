@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { api } from "../api/client";
-import type { LinePractice } from "../api/types";
+import type { LineAnalysis, LinePractice, PracticeWord } from "../api/types";
 import { useAsync } from "../hooks/useAsync";
 import { midiNoteName } from "../lib/pitch";
 import { chartRows, practiceAdvice, wordStats } from "../lib/practice";
@@ -46,7 +46,6 @@ export function LinePracticePanel({
 }
 
 export function PracticeView({ practice }: { practice: LinePractice }) {
-  const [aligned, setAligned] = useState(false);
   const { analysis } = practice;
   if (analysis === null) {
     return (
@@ -56,7 +55,19 @@ export function PracticeView({ practice }: { practice: LinePractice }) {
     );
   }
 
-  const stats = wordStats(practice.words, analysis);
+  return <AnalysisView analysis={analysis} words={practice.words} />;
+}
+
+/** Advice, chart and per-word table of an analyzed line (session or practice). */
+export function AnalysisView({
+  analysis,
+  words,
+}: {
+  analysis: LineAnalysis;
+  words: readonly PracticeWord[];
+}) {
+  const [aligned, setAligned] = useState(false);
+  const stats = wordStats(words, analysis);
   return (
     <div className="practice">
       <ul className="practice-advice">
@@ -74,7 +85,7 @@ export function PracticeView({ practice }: { practice: LinePractice }) {
         />{" "}
         Corregir el ritmo (ver solo la afinación)
       </label>
-      <PitchChart rows={chartRows(analysis, aligned)} words={practice.words} />
+      <PitchChart rows={chartRows(analysis, aligned)} words={words} />
       <details className="practice-table">
         <summary>Ver por palabra</summary>
         <table>

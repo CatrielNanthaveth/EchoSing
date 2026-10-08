@@ -93,14 +93,27 @@ export function ResultsPage() {
       <h2>Verso por verso</h2>
       <ol className="results-lines">
         {results.lines.map((line) => (
-          <LineRow key={line.line_index} line={line} sessionId={results.session_id} />
+          <LineRow
+            key={line.line_index}
+            line={line}
+            sessionId={results.session_id}
+            songId={results.song_id}
+          />
         ))}
       </ol>
     </section>
   );
 }
 
-function LineRow({ line, sessionId }: { line: LineReport; sessionId: string }) {
+function LineRow({
+  line,
+  sessionId,
+  songId,
+}: {
+  line: LineReport;
+  sessionId: string;
+  songId: string;
+}) {
   const [open, setOpen] = useState(false);
   let label: string;
   let tone: string;
@@ -137,6 +150,9 @@ function LineRow({ line, sessionId }: { line: LineReport; sessionId: string }) {
       {open && (
         <div id={panelId} className="results-line-practice">
           <LinePracticePanel sessionId={sessionId} lineIndex={line.line_index} />
+          <Link to={`/songs/${songId}/practica?verso=${String(line.line_index + 1)}`}>
+            Practicar este verso
+          </Link>
         </div>
       )}
     </li>

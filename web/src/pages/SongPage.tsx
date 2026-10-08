@@ -91,7 +91,10 @@ function Karaoke({ song }: { song: SongDetail }) {
           <h1>{song.title}</h1>
           <p className="muted">{song.artist}</p>
         </div>
-        <Link to="/">Volver al catálogo</Link>
+        <nav className="karaoke-links">
+          <Link to={`/songs/${song.id}/practica`}>Practicar un verso</Link>
+          <Link to="/">Volver al catálogo</Link>
+        </nav>
       </header>
 
       <LyricsView lines={song.lines} clock={clock} />

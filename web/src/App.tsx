@@ -4,6 +4,7 @@ import { AdminSessionPage } from "./pages/AdminSessionPage";
 import { CalibrationPage } from "./pages/CalibrationPage";
 import { CatalogPage } from "./pages/CatalogPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
+import { PracticePage } from "./pages/PracticePage";
 import { ResultsPage } from "./pages/ResultsPage";
 import { SongPage } from "./pages/SongPage";
 
@@ -22,6 +23,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<CatalogPage />} />
           <Route path="/songs/:songId" element={<SongPage />} />
+          <Route path="/songs/:songId/practica" element={<PracticePage />} />
           <Route path="/sessions/:sessionId/results" element={<ResultsPage />} />
           <Route path="/calibrar" element={<CalibrationPage />} />
           <Route path="/admin/sesiones/:sessionId" element={<AdminSessionPage />} />

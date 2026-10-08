@@ -15,3 +15,7 @@ if (!("ResizeObserver" in globalThis)) {
     disconnect = noop;
   };
 }
+
+// jsdom does not implement canvas; components skip drawing without a context.
+HTMLCanvasElement.prototype.getContext = (() =>
+  null) as typeof HTMLCanvasElement.prototype.getContext;

@@ -55,8 +55,14 @@ export class ApiClient {
     });
   }
 
-  getPitch(songId: string, signal?: AbortSignal): Promise<PitchResponse> {
-    return this.#request(`/songs/${encodeURIComponent(songId)}/pitch`, {
+  /** Reference pitch of a song, or of one line (frame 0 at the line start). */
+  getPitch(
+    songId: string,
+    signal?: AbortSignal,
+    lineIndex?: number,
+  ): Promise<PitchResponse> {
+    const line = lineIndex === undefined ? "" : `?line=${String(lineIndex)}`;
+    return this.#request(`/songs/${encodeURIComponent(songId)}/pitch${line}`, {
       signal: signal ?? null,
     });
   }
