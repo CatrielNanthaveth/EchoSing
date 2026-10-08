@@ -1,5 +1,6 @@
-import { Link, Route, Routes } from "react-router";
+import { Link, NavLink, Route, Routes } from "react-router";
 
+import { CalibrationPage } from "./pages/CalibrationPage";
 import { CatalogPage } from "./pages/CatalogPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { SongPage } from "./pages/SongPage";
@@ -11,11 +12,15 @@ export function App() {
         <Link to="/" className="brand">
           EchoSing
         </Link>
+        <nav className="app-nav">
+          <NavLink to="/calibrar">Calibrar latencia</NavLink>
+        </nav>
       </header>
       <main className="app-main">
         <Routes>
           <Route path="/" element={<CatalogPage />} />
           <Route path="/songs/:songId" element={<SongPage />} />
+          <Route path="/calibrar" element={<CalibrationPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>

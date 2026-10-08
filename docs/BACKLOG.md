@@ -184,7 +184,9 @@ Una canción es *jugable* si tiene análisis actual e instrumental, sin importar
   "reprocesando".
 - [x] **US-6.3** Reproductor: instrumental decodificado en Web Audio (reloj del
   `AudioContext`), letra sincronizada por palabra con cuenta regresiva y progreso.
-- [ ] **US-6.4** Calibración de latencia (tap al oír un pitido).
+- [x] **US-6.4** Calibración de latencia por micrófono: 8 pitidos a 100 BPM, el jugador
+  aplaude con cada uno; mediana de los desfases (salida + entrada) sin atípicos,
+  guardada en `localStorage`. Ajuste manual opcional.
 - [ ] **US-6.5** Micrófono + YIN en AudioWorklet, F0 acumulado por línea.
 - [ ] **US-6.6** Envío por WebSocket y feedback visual por línea.
 - [ ] **US-6.7** Pantalla de resultados.
