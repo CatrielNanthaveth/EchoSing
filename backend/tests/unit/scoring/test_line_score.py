@@ -283,3 +283,28 @@ def test_shifted_singing_with_pauses_is_barely_penalized(shift_frames: int) -> N
     result = score_line(reference, to_hz(shifted), HOP)
 
     assert result.score is not None and result.score > 90
+
+
+def test_choppy_detection_inside_notes_is_bridged() -> None:
+    # Real-time detection often drops 40-80 ms inside sung notes.
+    choppy = MELODY.copy()
+    choppy[np.arange(MELODY.size) % 12 >= 7] = np.nan  # 50 ms holes every 120 ms
+
+    bridged = score_line(reference_curve(), to_hz(choppy), HOP)
+    raw = score_line(
+        reference_curve(), to_hz(choppy), HOP, config=ScoringConfig(max_gap_ms=0)
+    )
+
+    assert bridged.score is not None and bridged.score > 95
+    assert raw.score is not None and raw.score < bridged.score - 10
+
+
+def test_real_pauses_are_not_bridged() -> None:
+    # Singing only the first and last notes leaves a 1.6 s pause: not a gap.
+    sung = np.where(
+        (np.arange(MELODY.size) < 40) | (np.arange(MELODY.size) >= 200), MELODY, np.nan
+    )
+
+    result = score_line(reference_curve(), to_hz(sung), HOP)
+
+    assert result.score is not None and result.score < 40

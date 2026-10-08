@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from app.scoring.pitch import (
+    bridge_gaps,
     compensate_latency,
     hz_to_midi,
     resample,
@@ -166,3 +167,39 @@ def test_broadcasting_builds_a_cost_matrix() -> None:
     matrix = semitone_error(sung[None, :], reference[:, None])
 
     np.testing.assert_allclose(matrix, [[0, 1, 2], [2, 1, 0]])
+
+
+# --- bridge_gaps ---------------------------------------------------------------------
+
+
+def test_short_gaps_between_voiced_frames_are_interpolated() -> None:
+    curve = np.array([60.0, np.nan, np.nan, 63.0, 63.0])
+
+    bridged = bridge_gaps(curve, hop_ms=10, max_gap_ms=20)
+
+    np.testing.assert_allclose(bridged, [60.0, 61.0, 62.0, 63.0, 63.0])
+    assert np.isnan(curve[1])  # the input is not modified
+
+
+def test_long_gaps_and_unvoiced_edges_are_kept() -> None:
+    nan = np.nan
+    curve = np.array([nan, 60.0, nan, nan, nan, 62.0, nan, 64.0, nan])
+
+    bridged = bridge_gaps(curve, hop_ms=10, max_gap_ms=20)
+
+    np.testing.assert_allclose(
+        bridged, [nan, 60.0, nan, nan, nan, 62.0, 63.0, 64.0, nan]
+    )
+
+
+@pytest.mark.parametrize(
+    ("curve", "max_gap_ms"),
+    [
+        (np.array([60.0, np.nan, 61.0]), 0.0),  # disabled
+        (np.array([np.nan, 60.0, np.nan]), 100.0),  # a single voiced frame
+        (np.full(4, np.nan), 100.0),
+        (np.zeros(0), 100.0),
+    ],
+)
+def test_nothing_to_bridge(curve: np.ndarray, max_gap_ms: float) -> None:
+    np.testing.assert_array_equal(bridge_gaps(curve, 10, max_gap_ms), curve)

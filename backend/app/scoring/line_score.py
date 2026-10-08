@@ -9,6 +9,7 @@ from app.schemas.analysis import PitchCurve
 from app.scoring.dtw import BoolArray, DTWResult, dtw
 from app.scoring.pitch import (
     FloatArray,
+    bridge_gaps,
     compensate_latency,
     hz_to_midi,
     resample,
@@ -33,6 +34,9 @@ class ScoringConfig(BaseModel):
             decreases linearly in between.
         max_error_semitones: Cap of the frame error; also the cost of a sung
             frame without voice.
+        max_gap_ms: Unvoiced gaps of the sung curve up to this long, between
+            voiced frames, are bridged before scoring: real-time detection
+            drops frames inside notes, while the reference is smoothed.
         octave_invariant: Whether singing an octave above or below is right.
         max_warp_ms: How far (in time) the alignment may drift from the
             diagonal: enough to enter late or hold a note, not enough to match
@@ -54,6 +58,7 @@ class ScoringConfig(BaseModel):
     full_credit_semitones: float = Field(default=0.5, ge=0)
     zero_credit_semitones: float = Field(default=2.0, gt=0)
     max_error_semitones: float = Field(default=6.0, gt=0)
+    max_gap_ms: float = Field(default=100.0, ge=0)
     octave_invariant: bool = True
     max_warp_ms: float | None = Field(default=200.0, ge=0)
     step_penalty_semitones: float = Field(default=2.0, ge=0)
@@ -183,7 +188,13 @@ def prepare_curves(
         hop,
     )
     sung = resample(
-        compensate_latency(hz_to_midi(np.asarray(sung_hz)), latency_ms, sung_hop_ms),
+        compensate_latency(
+            bridge_gaps(
+                hz_to_midi(np.asarray(sung_hz)), sung_hop_ms, config.max_gap_ms
+            ),
+            latency_ms,
+            sung_hop_ms,
+        ),
         sung_hop_ms,
         hop,
     )

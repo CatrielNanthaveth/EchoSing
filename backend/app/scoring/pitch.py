@@ -77,6 +77,44 @@ def resample(values: FloatArray, from_hop_ms: float, to_hop_ms: float) -> FloatA
     return result
 
 
+def bridge_gaps(values: FloatArray, hop_ms: float, max_gap_ms: float) -> FloatArray:
+    """Fill short unvoiced gaps between voiced frames by linear interpolation.
+
+    Real-time pitch detection drops frames inside sung notes (consonants,
+    breathy or quiet passages), while the reference is smoothed by CREPE's
+    Viterbi decoding. Bridging gaps up to ``max_gap_ms`` makes both curves
+    comparable; longer gaps (real pauses) and the unvoiced start and end of
+    the curve are kept.
+
+    Args:
+        values: Pitch curve (MIDI), NaN where unvoiced.
+        hop_ms: Time between frames.
+        max_gap_ms: Longest gap to fill (0 disables bridging).
+
+    Returns:
+        A new curve with the short gaps filled.
+    """
+    curve = np.asarray(values, dtype=np.float64)
+    voiced = ~np.isnan(curve)
+    if max_gap_ms <= 0 or np.count_nonzero(voiced) < 2:
+        return curve.copy()
+    # Runs of unvoiced frames: [starts, ends) from the edges of the mask.
+    edges = np.diff(np.concatenate(([0], (~voiced).astype(np.int8), [0])))
+    starts = np.flatnonzero(edges == 1)
+    ends = np.flatnonzero(edges == -1)
+    inside = (starts > 0) & (ends < curve.size)
+    short = inside & ((ends - starts) * hop_ms <= max_gap_ms)
+    # Mark the frames of the short runs with a difference array.
+    marks = np.zeros(curve.size + 1, dtype=np.int64)
+    np.add.at(marks, starts[short], 1)
+    np.add.at(marks, ends[short], -1)
+    fill = np.cumsum(marks[:-1]) > 0
+    frames = np.arange(curve.size)
+    interpolated = np.interp(frames, frames[voiced], curve[voiced])
+    bridged: FloatArray = np.where(fill, interpolated, curve)
+    return bridged
+
+
 def compensate_latency(
     values: FloatArray, latency_ms: float, hop_ms: float
 ) -> FloatArray:

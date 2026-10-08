@@ -300,8 +300,10 @@ should be sung points to lyrics out of sync with the vocals.
 `app/scoring/` holds pure numpy functions (no I/O) that compare a sung line with its
 reference pitch:
 
-1. the singer's pitch (Hz) is converted to MIDI, the measured latency is undone and
-   both curves are resampled to 20 ms frames;
+1. the singer's pitch (Hz) is converted to MIDI, unvoiced gaps up to 100 ms between
+   voiced frames are bridged (real-time detection drops frames inside notes, while
+   the reference is smoothed by CREPE's Viterbi decoding), the measured latency is
+   undone and both curves are resampled to 20 ms frames;
 2. a cost matrix of octave-invariant semitone errors is aligned with **DTW**
    (vectorized per anti-diagonal), limited to 200 ms of drift and with a penalty on
    non-diagonal steps, so late entries and rhythm variations are tolerated but
