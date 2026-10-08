@@ -195,6 +195,18 @@ Una canción es *jugable* si tiene análisis actual e instrumental, sin importar
 - [x] **US-6.7** Resultados (`/sessions/{id}/results`): puntaje, afinación, aciertos,
   mejor racha y cada verso (cantado, no cantado o no puntuable).
 
+## Mejoras pendientes (detectadas en la prueba M4)
+
+- [ ] **Palabras sostenidas:** Whisper corta las palabras largas antes de tiempo;
+  extender el final de la última palabra de cada verso mientras la voz de referencia
+  (CREPE) sigue sonando, sin pisar el verso siguiente. Afecta al resaltado de la letra
+  y a la ventana de puntaje.
+- [ ] **Sincronía en rap:** los tiempos de Whisper fallan en pasajes rápidos. Juntar
+  ejemplos concretos (canción + minuto) antes de diseñar el arreglo.
+- [ ] **Calibración:** al aplaudir la gente se adelanta 20–50 ms al pulso, y con
+  auriculares solo se mide eso. Evaluar mostrar el desfase por pitido y/o recomendar
+  calibrar con parlantes (el micrófono capta el pitido directamente).
+
 ## E7 — Modo práctica
 
 - [ ] **US-7.1** Endpoint con curva de referencia y curva del usuario alineadas (path DTW).
