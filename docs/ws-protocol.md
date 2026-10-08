@@ -70,7 +70,38 @@ Reply:
 - `scorable: false` (with `score`/`accuracy` null) for lines with almost no sung
   reference, e.g. spoken passages: they neither count nor break streaks.
 
-## 4. Errors
+## 4. Finish
+
+When the song ends:
+
+```json
+{"type": "finish"}
+```
+
+The server stores the totals, replies and closes the connection (code 1000):
+
+```json
+{"type": "session_summary", "total_score": 78.4, "accuracy": 0.61,
+ "best_streak": 12, "scored_lines": 63, "hit_lines": 50}
+```
+
+Lines that were never sent count as 0 (otherwise singing one line perfectly would
+give a perfect total). `total_score`/`accuracy` are null if the song has nothing
+scorable. Reconnecting to a finished session closes with `4409`.
+
+## 5. Results (REST)
+
+```http
+GET /sessions/{session_id}/results
+```
+
+Returns the session (`status`, `started_at`, `finished_at`), its `totals` (same fields
+as `session_summary`) and one entry per line: `line_index`, `text`, `sung`,
+`scorable`, `score`, `accuracy`, `hit`. While the session is active, totals cover the
+lines sung so far and unsung lines have null results; once finished, unsung lines
+score 0 (`sung: false`). `404` if the session does not exist.
+
+## 6. Errors
 
 Errors never close the connection:
 

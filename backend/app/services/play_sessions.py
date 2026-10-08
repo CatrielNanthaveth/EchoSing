@@ -20,12 +20,15 @@ from app.domain.enums import PlaySessionStatus
 from app.schemas.analysis import LyricLine, PitchCurve
 from app.schemas.sessions import (
     LinePitchMessage,
+    LineReport,
     LineScoreMessage,
     SessionCreate,
     SessionCreated,
+    SessionResults,
+    SessionTotals,
 )
 from app.scoring.line_score import LineResult, ScoringConfig, score_line
-from app.scoring.session import current_streak
+from app.scoring.session import current_streak, summarize_session
 from app.services.errors import SongNotFoundError
 
 _LINES = TypeAdapter(list[LyricLine])
@@ -66,6 +69,21 @@ class LiveSession:
     lines: list[LyricLine]
     pitch: PitchCurve
     results: dict[int, LineResult] = field(default_factory=dict)
+
+
+def _line_report(
+    line: LyricLine, sung: bool, results: dict[int, LineResult]
+) -> LineReport:
+    result = results.get(line.index)
+    return LineReport(
+        line_index=line.index,
+        text=line.text,
+        sung=sung,
+        scorable=None if result is None else result.scorable,
+        score=None if result is None else result.score,
+        accuracy=None if result is None else result.accuracy,
+        hit=False if result is None else result.hit,
+    )
 
 
 def _result_from_row(
@@ -202,6 +220,102 @@ class PlaySessionService:
             accuracy=result.accuracy,
             hit=result.hit,
             streak=current_streak(live.results, index),
+        )
+
+    def _with_unsung_lines(
+        self, lines: list[LyricLine], pitch: PitchCurve, sung: dict[int, LineResult]
+    ) -> dict[int, LineResult]:
+        """Results of every line, scoring the unsung ones as silence (0).
+
+        Scoring silence is cheap (no alignment) and tells whether each unsung
+        line would have counted. Unsung lines are never stored, so reports can
+        tell "sung badly" from "not sung".
+        """
+        complete = dict(sung)
+        for line in lines:
+            if line.index not in complete:
+                complete[line.index] = score_line(
+                    pitch.slice_ms(line.start_ms, line.end_ms),
+                    np.zeros(0),
+                    self._scoring.scoring_hop_ms,
+                    config=self._scoring,
+                )
+        return complete
+
+    async def finish(self, live: LiveSession) -> SessionTotals:
+        """Close a session: totals count unsung lines as 0 and are stored.
+
+        Without counting unsung lines, singing a single line perfectly would
+        give a perfect total.
+
+        Args:
+            live: Open session.
+
+        Returns:
+            The final totals.
+
+        Raises:
+            SessionNotFoundError: If the session disappeared meanwhile.
+        """
+        play_session = await self._play_sessions.get(live.session_id)
+        if play_session is None:  # pragma: no cover - sessions are never deleted
+            raise SessionNotFoundError(f"Session {live.session_id} does not exist")
+        complete = self._with_unsung_lines(live.lines, live.pitch, live.results)
+        summary = summarize_session([complete[i] for i in sorted(complete)])
+        await self._play_sessions.finish(
+            play_session,
+            total_score=summary.total_score,
+            accuracy=summary.accuracy,
+            best_streak=summary.best_streak,
+        )
+        await self._session.commit()
+        return SessionTotals.model_validate(summary.model_dump())
+
+    async def get_results(self, session_id: uuid.UUID) -> SessionResults:
+        """Report a session: totals and the result of every line.
+
+        Args:
+            session_id: Id of the session.
+
+        Returns:
+            The report. For an active session, totals cover the lines sung so
+            far and unsung lines have no result yet; once finished, unsung
+            lines score 0, as in the stored totals.
+
+        Raises:
+            SessionNotFoundError: If the session does not exist.
+        """
+        play_session = await self._play_sessions.get(session_id)
+        if play_session is None:
+            raise SessionNotFoundError(f"Session {session_id} does not exist")
+        reference = await self._analyses.get_reference(play_session.analysis_id)
+        if reference is None:  # pragma: no cover - guaranteed by the foreign key
+            raise SessionNotFoundError(f"Session {session_id} has no analysis")
+        raw_pitch, raw_lines = reference
+        lines = _LINES.validate_python(raw_lines)
+        sung = {
+            row.line_index: _result_from_row(
+                row.scorable, row.score, row.accuracy, row.hit, row.voiced_frames
+            )
+            for row in await self._play_sessions.list_line_scores(session_id)
+        }
+        finished = play_session.status is PlaySessionStatus.FINISHED
+        results = (
+            self._with_unsung_lines(lines, PitchCurve.model_validate(raw_pitch), sung)
+            if finished
+            else sung
+        )
+        summary = summarize_session([results[i] for i in sorted(results)])
+        return SessionResults(
+            session_id=play_session.id,
+            song_id=play_session.song_id,
+            analysis_id=play_session.analysis_id,
+            player_name=play_session.player_name,
+            status=play_session.status,
+            started_at=play_session.started_at,
+            finished_at=play_session.finished_at,
+            totals=SessionTotals.model_validate(summary.model_dump()),
+            lines=[_line_report(line, line.index in sung, results) for line in lines],
         )
 
     async def create(self, request: SessionCreate) -> SessionCreated:

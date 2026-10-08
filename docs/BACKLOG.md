@@ -164,11 +164,17 @@ Una canción es *jugable* si tiene análisis actual e instrumental, sin importar
 
 ## E5 — Sesión en tiempo real
 
-- [ ] **US-5.1** `POST /sessions` (`song_id`, `player_name`, `latency_offset_ms`).
-- [ ] **US-5.2 WebSocket** `/ws/sessions/{id}`: `line_pitch` → DTW en executor →
-  `line_score`. Protocolo en `docs/ws-protocol.md`.
-- [ ] **US-5.3** Persistencia de puntajes por línea y cierre con `finish`.
-- [ ] **US-5.4** `GET /sessions/{id}/results`.
+- [x] **US-5.1** `POST /sessions` (`song_id`, `player_name`, `latency_offset_ms`); la
+  sesión queda ligada al `analysis_id` vigente.
+- [x] **US-5.2 WebSocket** `/ws/sessions/{id}`: `line_pitch` → DTW en executor →
+  `line_score` con racha en vivo. Errores tipados sin cortar la conexión; cierre 4404
+  (sesión inexistente) y 4409 (terminada). Protocolo en `docs/ws-protocol.md`.
+- [x] **US-5.3** Persistencia de puntajes por línea (reconexión retoma lo cantado) y
+  cierre con `finish`: los versos no cantados cuentan 0 en los totales, pero no se
+  guardan (el reporte distingue "cantado mal" de "no cantado").
+- [x] **US-5.4** `GET /sessions/{id}/results`: totales y resultado de cada verso.
+- Verificación M3 con canciones reales: perfecto 100, 1 semitono abajo ~67, al azar
+  ~30. Corrigió un bug del DTW en versos con muchas pausas (rap).
 
 ## E6 — Cliente web mínimo
 

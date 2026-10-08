@@ -2,11 +2,13 @@
 
 import uuid
 from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import LineScore, PlaySession, SongAnalysis
+from app.domain.enums import PlaySessionStatus
 
 
 class PlaySessionRepository:
@@ -126,6 +128,29 @@ class PlaySessionRepository:
         self._session.add(line_score)
         await self._session.flush()
         return line_score
+
+    async def finish(
+        self,
+        play_session: PlaySession,
+        *,
+        total_score: float | None,
+        accuracy: float | None,
+        best_streak: int,
+    ) -> None:
+        """Record the totals of a session and mark it finished.
+
+        Args:
+            play_session: Session to finish.
+            total_score: Final score 0-100, None if nothing was scorable.
+            accuracy: Final accuracy 0-1, None if nothing was scorable.
+            best_streak: Longest run of hit lines.
+        """
+        play_session.total_score = total_score
+        play_session.accuracy = accuracy
+        play_session.best_streak = best_streak
+        play_session.status = PlaySessionStatus.FINISHED
+        play_session.finished_at = datetime.now(UTC)
+        await self._session.flush()
 
     async def list_line_scores(self, session_id: uuid.UUID) -> Sequence[LineScore]:
         """List the scores of a play session ordered by line.

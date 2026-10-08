@@ -352,3 +352,124 @@ async def test_line_scored_concurrently_by_another_connection(
         await service.score_line(live, message)
 
     assert 0 not in live.results
+
+
+# --- US-5.3 / US-5.4: finish and results ----------------------------------------
+
+
+FINISH = json.dumps({"type": "finish"})
+
+
+async def test_finish_counts_unsung_lines_as_zero_and_closes(
+    ws_app: FastAPI,
+    db_session: AsyncSession,
+    song_id: uuid.UUID,
+    analysis_json: dict[str, Any],
+) -> None:
+    async with open_client(ws_app) as client:
+        session_id = await start_session(client, song_id)
+        async with connect(client, session_id) as ws:
+            await receive(ws)
+            for index in (0, 1):  # line 2 is never sung
+                await ws.send_text(
+                    pitch_message(index, sung_line(analysis_json, index))
+                )
+                await receive(ws)
+            await ws.send_text(FINISH)
+            summary = await receive(ws)
+            with pytest.raises(WebSocketDisconnect) as closed:
+                await ws.receive_text()
+
+    assert closed.value.code == 1000
+    assert summary["type"] == "session_summary"
+    assert 0 < summary["total_score"] < 100  # line 2 counts as 0
+    assert (summary["best_streak"], summary["scored_lines"], summary["hit_lines"]) == (
+        2,
+        3,
+        2,
+    )
+    play_session = await db_session.get(PlaySession, uuid.UUID(session_id))
+    assert play_session is not None
+    assert play_session.status is PlaySessionStatus.FINISHED
+    assert play_session.finished_at is not None
+    assert play_session.total_score == summary["total_score"]
+    assert play_session.best_streak == 2
+    stored = (
+        await db_session.scalars(
+            select(LineScore.line_index).where(
+                LineScore.session_id == uuid.UUID(session_id)
+            )
+        )
+    ).all()
+    assert sorted(stored) == [0, 1]  # unsung lines are not stored
+
+
+async def test_finish_without_singing_scores_zero(
+    ws_app: FastAPI, song_id: uuid.UUID
+) -> None:
+    async with open_client(ws_app) as client:
+        session_id = await start_session(client, song_id)
+        async with connect(client, session_id) as ws:
+            await receive(ws)
+            await ws.send_text(FINISH)
+            summary = await receive(ws)
+
+    assert (summary["total_score"], summary["hit_lines"]) == (0.0, 0)
+
+
+async def test_results_of_an_active_session(
+    ws_app: FastAPI, song_id: uuid.UUID, analysis_json: dict[str, Any]
+) -> None:
+    async with open_client(ws_app) as client:
+        session_id = await start_session(client, song_id)
+        async with connect(client, session_id) as ws:
+            await receive(ws)
+            await ws.send_text(pitch_message(0, sung_line(analysis_json, 0)))
+            await receive(ws)
+        response = await client.get(f"/sessions/{session_id}/results")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "active"
+    assert body["finished_at"] is None
+    assert body["player_name"] == "Ana"
+    # Totals so far only cover the line already sung.
+    assert (body["totals"]["total_score"], body["totals"]["scored_lines"]) == (
+        100.0,
+        1,
+    )
+    first, second = body["lines"][0], body["lines"][1]
+    assert first["text"] == analysis_json["lines"][0]["text"]
+    assert (first["sung"], first["score"], first["hit"]) == (True, 100.0, True)
+    assert (second["sung"], second["score"], second["scorable"]) == (
+        False,
+        None,
+        None,
+    )
+
+
+async def test_results_of_a_finished_session_match_the_summary(
+    ws_app: FastAPI, song_id: uuid.UUID, analysis_json: dict[str, Any]
+) -> None:
+    async with open_client(ws_app) as client:
+        session_id = await start_session(client, song_id)
+        async with connect(client, session_id) as ws:
+            await receive(ws)
+            await ws.send_text(pitch_message(0, sung_line(analysis_json, 0)))
+            await receive(ws)
+            await ws.send_text(FINISH)
+            summary = await receive(ws)
+        body = (await client.get(f"/sessions/{session_id}/results")).json()
+
+    assert body["status"] == "finished"
+    assert body["finished_at"] is not None
+    assert body["totals"] == {k: v for k, v in summary.items() if k != "type"}
+    unsung = body["lines"][2]
+    assert (unsung["sung"], unsung["scorable"], unsung["score"]) == (False, True, 0.0)
+
+
+async def test_results_of_unknown_session_is_404(ws_app: FastAPI) -> None:
+    async with open_client(ws_app) as client:
+        response = await client.get(f"/sessions/{uuid.uuid4()}/results")
+
+    assert response.status_code == 404

@@ -1,10 +1,13 @@
 """Schemas of play sessions: REST bodies and WebSocket messages."""
 
 import uuid
+from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.domain.enums import PlaySessionStatus
 
 
 class SessionCreate(BaseModel):
@@ -131,3 +134,93 @@ class ErrorMessage(BaseModel):
     type: Literal["error"] = "error"
     code: ErrorCode
     detail: str
+
+
+class FinishMessage(BaseModel):
+    """Client -> server: the song is over; compute the totals and close.
+
+    Attributes:
+        type: Message type.
+    """
+
+    type: Literal["finish"]
+
+
+ClientMessage = Annotated[LinePitchMessage | FinishMessage, Field(discriminator="type")]
+"""Any message a client may send."""
+
+
+class SessionTotals(BaseModel):
+    """Totals of a performance.
+
+    Attributes:
+        total_score: 0-100 weighted by line length; None if nothing scorable.
+        accuracy: Fraction of in-tune frames; None if nothing scorable.
+        best_streak: Longest run of consecutive hit lines.
+        scored_lines: Scorable lines included.
+        hit_lines: Lines that were hits.
+    """
+
+    total_score: float | None
+    accuracy: float | None
+    best_streak: int
+    scored_lines: int
+    hit_lines: int
+
+
+class SessionSummaryMessage(SessionTotals):
+    """Server -> client: final totals, sent right before closing.
+
+    Attributes:
+        type: Message type.
+    """
+
+    type: Literal["session_summary"] = "session_summary"
+
+
+class LineReport(BaseModel):
+    """Result of one lyric line in a session report.
+
+    Attributes:
+        line_index: Line index.
+        text: Line text.
+        sung: Whether the player sang it (unsung lines score 0 at finish).
+        scorable: Whether the line has enough singing to be judged.
+        score: 0-100, None if not sung yet or not scorable.
+        accuracy: 0-1, None if not sung yet or not scorable.
+        hit: Whether the line was a hit.
+    """
+
+    line_index: int
+    text: str
+    sung: bool
+    scorable: bool | None
+    score: float | None
+    accuracy: float | None
+    hit: bool
+
+
+class SessionResults(BaseModel):
+    """Report of a play session.
+
+    Attributes:
+        session_id: Session id.
+        song_id: Song sung.
+        analysis_id: Analysis the session was scored against.
+        player_name: Display name of the player.
+        status: ``active`` or ``finished``.
+        started_at: When the session started.
+        finished_at: When it finished, if it did.
+        totals: Totals over the lines scored so far (all lines once finished).
+        lines: One entry per lyric line, in order.
+    """
+
+    session_id: uuid.UUID
+    song_id: uuid.UUID
+    analysis_id: uuid.UUID
+    player_name: str
+    status: PlaySessionStatus
+    started_at: datetime
+    finished_at: datetime | None
+    totals: SessionTotals
+    lines: list[LineReport]

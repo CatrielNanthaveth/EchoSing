@@ -269,6 +269,20 @@ evaluated: ~2x faster but ~5.5 GB of VRAM.
 Known limitation of every separator: high-pitched vocals share frequencies with
 instrument overtones, so the instrumental can sound duller where they were removed.
 
+## Play sessions
+
+| Endpoint | Does |
+|---|---|
+| `POST /sessions` | Starts a session (`song_id`, `player_name`, `latency_offset_ms`) bound to the song's current analysis |
+| `WS /ws/sessions/{id}` | Scores each sung line in real time (protocol: `docs/ws-protocol.md`) |
+| `GET /sessions/{id}/results` | Totals and the result of every line |
+
+The client sends the pitch it measured over each line (`line_pitch`) and gets its
+score and the live streak back (`line_score`); `finish` closes the session and returns
+the totals. Line scores are stored as they arrive, so a reconnection resumes where it
+left off. Unsung lines count as 0 in the final totals but are not stored, so reports
+tell "sung badly" from "not sung".
+
 ## Scoring engine
 
 `app/scoring/` holds pure numpy functions (no I/O) that compare a sung line with its
@@ -279,7 +293,9 @@ reference pitch:
 2. a cost matrix of octave-invariant semitone errors is aligned with **DTW**
    (vectorized per anti-diagonal), limited to 200 ms of drift and with a penalty on
    non-diagonal steps, so late entries and rhythm variations are tolerated but
-   off-key singing cannot "borrow" neighboring notes;
+   off-key singing cannot "borrow" neighboring notes. The whole line timeline is
+   aligned, pauses included (they cost nothing), so lines with many pauses keep
+   their timing;
 3. each sung reference frame gets full credit within 0.5 semitone, decreasing to none
    at 2 semitones; the line score (0-100) is weighted by the reference confidence;
 4. session totals weigh lines by length; the best streak counts consecutive hits
