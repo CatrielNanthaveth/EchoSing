@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.gzip import DEFAULT_EXCLUDED_CONTENT_TYPES
 
-from app.api.routes import admin, health, songs
+from app.api.routes import admin, health, sessions, songs
 from app.core.config import Settings, get_settings
 from app.core.redis import create_redis_client
 from app.db.session import create_engine, create_session_factory
@@ -78,6 +78,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     application.include_router(health.router)
     application.include_router(songs.router)
+    application.include_router(sessions.router)
     application.include_router(admin.router)
     return application
 

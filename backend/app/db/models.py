@@ -165,6 +165,10 @@ class LineScore(Base):
         CheckConstraint("score >= 0 AND score <= 100", name="score_range"),
         CheckConstraint("accuracy >= 0 AND accuracy <= 1", name="accuracy_range"),
         CheckConstraint("line_index >= 0", name="line_index_non_negative"),
+        CheckConstraint(
+            "NOT scorable OR (score IS NOT NULL AND accuracy IS NOT NULL)",
+            name="scorable_has_score",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
@@ -172,7 +176,12 @@ class LineScore(Base):
         ForeignKey("play_sessions.id", ondelete="CASCADE")
     )
     line_index: Mapped[int]
-    score: Mapped[float]
-    accuracy: Mapped[float]
+    # A line with too little singing in the reference is not scorable: it is
+    # recorded (it was sung) but has no score and does not count in totals.
+    scorable: Mapped[bool] = mapped_column(default=True, server_default="true")
+    score: Mapped[float | None]
+    accuracy: Mapped[float | None]
     hit: Mapped[bool]
+    # Sung reference frames of the line: its weight in the session totals.
+    voiced_frames: Mapped[int] = mapped_column(default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

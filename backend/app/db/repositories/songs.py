@@ -231,6 +231,28 @@ class SongAnalysisRepository:
         await self._session.flush()
         return analysis
 
+    async def get_current_identity(
+        self, song_id: uuid.UUID
+    ) -> tuple[uuid.UUID, int] | None:
+        """Fetch the id and version of a song's current analysis.
+
+        The (large) analysis data is not loaded.
+
+        Args:
+            song_id: Id of the song.
+
+        Returns:
+            ``(analysis_id, version)``, or None if the song has no analysis.
+        """
+        row = (
+            await self._session.execute(
+                select(SongAnalysis.id, SongAnalysis.version).where(
+                    SongAnalysis.song_id == song_id, SongAnalysis.is_current
+                )
+            )
+        ).first()
+        return None if row is None else (row[0], row[1])
+
     async def get_current_version(self, song_id: uuid.UUID) -> int | None:
         """Fetch the version number of a song's current analysis.
 

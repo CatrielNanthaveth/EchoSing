@@ -12,10 +12,15 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import make_url, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 
 from app.core.config import Settings
+from app.db.session import get_db_session
+from app.main import create_app
+from app.storage.dependencies import get_storage
+from app.storage.local import LocalStorage
 
 TEST_DATABASE_NAME = "echosing_test"
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -78,3 +83,26 @@ async def db_session(migrated_engine: AsyncEngine) -> AsyncIterator[AsyncSession
         finally:
             await session.close()
             await transaction.rollback()
+
+
+@pytest.fixture
+def storage(tmp_path: Path) -> LocalStorage:
+    return LocalStorage(tmp_path / "storage")
+
+
+@pytest.fixture
+async def api_client(
+    db_session: AsyncSession, storage: LocalStorage
+) -> AsyncIterator[AsyncClient]:
+    """Public API client bound to the test transaction and a temporary storage."""
+    app = create_app(Settings(_env_file=None, cors_origins=["http://localhost:5173"]))
+
+    async def session_override() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    app.dependency_overrides[get_db_session] = session_override
+    app.dependency_overrides[get_storage] = lambda: storage
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        yield client
