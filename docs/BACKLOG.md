@@ -180,7 +180,8 @@ Una canción es *jugable* si tiene análisis actual e instrumental, sin importar
 
 - [x] **US-6.1** Scaffolding Vite + React + TS (estricto), ESLint, Prettier, Vitest;
   cliente de API tipado con tipos generados del OpenAPI (incluye mensajes del WS).
-- [ ] **US-6.2** Catálogo con búsqueda.
+- [x] **US-6.2** Catálogo con búsqueda (debounce, en la URL), paginación y marca de
+  "reprocesando".
 - [ ] **US-6.3** Reproductor: instrumental + letras sincronizadas por palabra.
 - [ ] **US-6.4** Calibración de latencia (tap al oír un pitido).
 - [ ] **US-6.5** Micrófono + YIN en AudioWorklet, F0 acumulado por línea.

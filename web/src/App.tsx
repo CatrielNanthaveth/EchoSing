@@ -1,5 +1,6 @@
 import { Link, Route, Routes } from "react-router";
 
+import { CatalogPage } from "./pages/CatalogPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
 export function App() {
@@ -12,7 +13,7 @@ export function App() {
       </header>
       <main className="app-main">
         <Routes>
-          <Route path="/" element={<p className="muted">Catálogo próximamente.</p>} />
+          <Route path="/" element={<CatalogPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
