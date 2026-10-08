@@ -301,13 +301,17 @@ reference pitch:
    off-key singing cannot "borrow" neighboring notes. The whole line timeline is
    aligned, pauses included (they cost nothing), so lines with many pauses keep
    their timing;
-3. each sung reference frame gets full credit within 0.5 semitone, decreasing to none
-   at 2 semitones; the line score (0-100) is weighted by the reference confidence;
+3. each sung reference frame gets full credit within a tolerance that depends on the
+   session's difficulty, decreasing linearly to none (easy: 1 -> 3 semitones, normal:
+   0.75 -> 2.5, hard: 0.5 -> 2); the line score (0-100) is weighted by the reference
+   confidence;
 4. session totals weigh lines by length; the best streak counts consecutive hits
    (score >= 60).
 
-Every threshold lives in `ScoringConfig`. Reference behavior: exact or octave-shifted
-singing 100, 1 semitone off ~67, 150 ms late 100, random notes ~35. An 8 s line is
+Every threshold lives in `ScoringConfig`; `app/scoring/difficulty.py` maps each level
+to its pitch tolerance (sessions created before levels existed are `hard`). Reference
+behavior: exact or octave-shifted singing 100; 1 semitone off 100 (easy), ~86
+(normal), ~67 (hard); 150 ms late 100; random notes ~35. An 8 s line is
 scored in ~16 ms.
 
 The scoring package must keep 100% test coverage:

@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.domain.enums import PlaySessionStatus
+from app.domain.enums import Difficulty, PlaySessionStatus
 
 
 class SessionCreate(BaseModel):
@@ -18,6 +18,7 @@ class SessionCreate(BaseModel):
         player_name: Display name of the anonymous player.
         latency_offset_ms: Audio latency measured by the client's calibration;
             positive when the voice arrives late.
+        difficulty: Pitch tolerance of the scoring.
     """
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -25,6 +26,7 @@ class SessionCreate(BaseModel):
     song_id: uuid.UUID
     player_name: str = Field(min_length=1, max_length=50)
     latency_offset_ms: int = Field(default=0, ge=-500, le=1000)
+    difficulty: Difficulty = Difficulty.NORMAL
 
 
 class SessionCreated(BaseModel):
@@ -38,6 +40,7 @@ class SessionCreated(BaseModel):
         line_count: Number of lyric lines to sing.
         player_name: Display name of the player.
         latency_offset_ms: Latency applied when scoring.
+        difficulty: Pitch tolerance of the scoring.
     """
 
     session_id: uuid.UUID
@@ -47,6 +50,7 @@ class SessionCreated(BaseModel):
     line_count: int
     player_name: str
     latency_offset_ms: int
+    difficulty: Difficulty
 
 
 # --- WebSocket messages (see docs/ws-protocol.md) ---------------------------------
@@ -208,6 +212,7 @@ class SessionResults(BaseModel):
         song_id: Song sung.
         analysis_id: Analysis the session was scored against.
         player_name: Display name of the player.
+        difficulty: Pitch tolerance the session is scored with.
         status: ``active`` or ``finished``.
         started_at: When the session started.
         finished_at: When it finished, if it did.
@@ -219,6 +224,7 @@ class SessionResults(BaseModel):
     song_id: uuid.UUID
     analysis_id: uuid.UUID
     player_name: str
+    difficulty: Difficulty
     status: PlaySessionStatus
     started_at: datetime
     finished_at: datetime | None

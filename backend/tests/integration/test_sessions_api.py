@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import PlaySession
 from app.db.repositories.songs import SongAnalysisRepository
-from app.domain.enums import PlaySessionStatus
+from app.domain.enums import Difficulty, PlaySessionStatus
 from app.storage.local import LocalStorage
 from tests.integration.catalog_helpers import add_song
 
@@ -33,6 +33,7 @@ async def test_create_session_binds_the_current_analysis(
             "song_id": str(song_id),
             "player_name": "  Ana ",
             "latency_offset_ms": 120,
+            "difficulty": "easy",
         },
     )
 
@@ -43,13 +44,15 @@ async def test_create_session_binds_the_current_analysis(
     assert body["analysis_version"] == 1
     assert body["line_count"] == 3
     assert (body["player_name"], body["latency_offset_ms"]) == ("Ana", 120)
+    assert body["difficulty"] == "easy"
     stored = await db_session.get(PlaySession, uuid.UUID(body["session_id"]))
     assert stored is not None
     assert stored.status is PlaySessionStatus.ACTIVE
     assert stored.analysis_id == current.id
+    assert stored.difficulty is Difficulty.EASY
 
 
-async def test_latency_defaults_to_zero(
+async def test_latency_defaults_to_zero_and_difficulty_to_normal(
     api_client: AsyncClient,
     db_session: AsyncSession,
     storage: LocalStorage,
@@ -62,6 +65,7 @@ async def test_latency_defaults_to_zero(
     )
 
     assert response.json()["latency_offset_ms"] == 0
+    assert response.json()["difficulty"] == "normal"
 
 
 async def test_session_for_unavailable_song_is_404(
@@ -90,6 +94,7 @@ async def test_session_for_unavailable_song_is_404(
         {"song_id": str(uuid.uuid4()), "player_name": "x" * 51},
         {"song_id": str(uuid.uuid4()), "player_name": "Ana", "latency_offset_ms": 5000},
         {"song_id": str(uuid.uuid4()), "player_name": "Ana", "latency_offset_ms": -501},
+        {"song_id": str(uuid.uuid4()), "player_name": "Ana", "difficulty": "extreme"},
     ],
 )
 async def test_invalid_session_requests(

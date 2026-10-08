@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import LineScore, PlaySession, SongAnalysis
-from app.domain.enums import PlaySessionStatus
+from app.domain.enums import Difficulty, PlaySessionStatus
 
 
 class PlaySessionRepository:
@@ -27,6 +27,7 @@ class PlaySessionRepository:
         analysis: SongAnalysis,
         player_name: str,
         latency_offset_ms: int = 0,
+        difficulty: Difficulty = Difficulty.NORMAL,
     ) -> PlaySession:
         """Start a play session against a specific analysis.
 
@@ -36,12 +37,13 @@ class PlaySessionRepository:
             analysis: Analysis (lyrics + reference pitch) the player sings.
             player_name: Display name of the anonymous player.
             latency_offset_ms: Audio latency measured during calibration.
+            difficulty: Pitch tolerance of the scoring.
 
         Returns:
             The persisted session in ``ACTIVE`` status.
         """
         return await self.start(
-            analysis.song_id, analysis.id, player_name, latency_offset_ms
+            analysis.song_id, analysis.id, player_name, latency_offset_ms, difficulty
         )
 
     async def start(
@@ -50,6 +52,7 @@ class PlaySessionRepository:
         analysis_id: uuid.UUID,
         player_name: str,
         latency_offset_ms: int = 0,
+        difficulty: Difficulty = Difficulty.NORMAL,
     ) -> PlaySession:
         """Start a play session from the identity of an analysis.
 
@@ -61,6 +64,7 @@ class PlaySessionRepository:
             analysis_id: Id of the analysis the player sings.
             player_name: Display name of the anonymous player.
             latency_offset_ms: Audio latency measured during calibration.
+            difficulty: Pitch tolerance of the scoring.
 
         Returns:
             The persisted session in ``ACTIVE`` status.
@@ -70,6 +74,7 @@ class PlaySessionRepository:
             analysis_id=analysis_id,
             player_name=player_name,
             latency_offset_ms=latency_offset_ms,
+            difficulty=difficulty,
         )
         self._session.add(play_session)
         await self._session.flush()

@@ -26,6 +26,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base, str_enum
 from app.domain.enums import (
     AssetKind,
+    Difficulty,
     IngestionStage,
     PlaySessionStatus,
     SeparationPreset,
@@ -145,6 +146,11 @@ class PlaySession(Base):
     )
     player_name: Mapped[str] = mapped_column(String(50))
     latency_offset_ms: Mapped[int] = mapped_column(default=0)
+    difficulty: Mapped[Difficulty] = mapped_column(
+        str_enum(Difficulty, "difficulty"),
+        default=Difficulty.NORMAL,
+        server_default=Difficulty.NORMAL.value,
+    )
     status: Mapped[PlaySessionStatus] = mapped_column(
         str_enum(PlaySessionStatus, "play_session_status"),
         default=PlaySessionStatus.ACTIVE,

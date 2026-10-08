@@ -51,6 +51,20 @@ class IngestionStage(StrEnum):
         return self in (IngestionStage.DONE, IngestionStage.FAILED)
 
 
+class Difficulty(StrEnum):
+    """How far from the note singing still earns credit.
+
+    Attributes:
+        EASY: Full credit within 1 semitone, none from 3.
+        NORMAL: Full credit within 3/4 of a semitone, none from 2.5.
+        HARD: Full credit within half a semitone, none from 2.
+    """
+
+    EASY = "easy"
+    NORMAL = "normal"
+    HARD = "hard"
+
+
 class PlaySessionStatus(StrEnum):
     """Lifecycle of a karaoke play session."""
 

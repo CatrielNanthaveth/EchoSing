@@ -27,6 +27,7 @@ from app.schemas.sessions import (
     SessionResults,
     SessionTotals,
 )
+from app.scoring.difficulty import scoring_config
 from app.scoring.line_score import LineResult, ScoringConfig, score_line
 from app.scoring.session import current_streak, summarize_session
 from app.services.errors import SongNotFoundError
@@ -58,6 +59,7 @@ class LiveSession:
         session_id: Id of the session.
         analysis_id: Analysis the session is scored against.
         latency_ms: Latency compensated when scoring.
+        scoring: Scoring parameters of the session's difficulty.
         lines: Lyric lines of the analysis.
         pitch: Reference pitch curve of the whole song.
         results: Results of the lines scored so far, by line index.
@@ -66,6 +68,7 @@ class LiveSession:
     session_id: uuid.UUID
     analysis_id: uuid.UUID
     latency_ms: int
+    scoring: ScoringConfig
     lines: list[LyricLine]
     pitch: PitchCurve
     results: dict[int, LineResult] = field(default_factory=dict)
@@ -112,7 +115,8 @@ class PlaySessionService:
 
         Args:
             session: Database session; this service commits its own changes.
-            scoring: Scoring parameters.
+            scoring: Base scoring parameters; each session applies the pitch
+                tolerance of its difficulty on top.
         """
         self._session = session
         self._scoring = scoring or ScoringConfig()
@@ -147,6 +151,7 @@ class PlaySessionService:
             session_id=session_id,
             analysis_id=play_session.analysis_id,
             latency_ms=play_session.latency_offset_ms,
+            scoring=scoring_config(play_session.difficulty, self._scoring),
             lines=_LINES.validate_python(raw_lines),
             pitch=PitchCurve.model_validate(raw_pitch),
             results={
@@ -193,7 +198,7 @@ class PlaySessionService:
                 np.asarray(message.f0_hz, dtype=np.float64),
                 message.hop_ms,
                 latency_ms=live.latency_ms,
-                config=self._scoring,
+                config=live.scoring,
             ),
         )
 
@@ -222,8 +227,12 @@ class PlaySessionService:
             streak=current_streak(live.results, index),
         )
 
+    @staticmethod
     def _with_unsung_lines(
-        self, lines: list[LyricLine], pitch: PitchCurve, sung: dict[int, LineResult]
+        lines: list[LyricLine],
+        pitch: PitchCurve,
+        sung: dict[int, LineResult],
+        scoring: ScoringConfig,
     ) -> dict[int, LineResult]:
         """Results of every line, scoring the unsung ones as silence (0).
 
@@ -237,8 +246,8 @@ class PlaySessionService:
                 complete[line.index] = score_line(
                     pitch.slice_ms(line.start_ms, line.end_ms),
                     np.zeros(0),
-                    self._scoring.scoring_hop_ms,
-                    config=self._scoring,
+                    scoring.scoring_hop_ms,
+                    config=scoring,
                 )
         return complete
 
@@ -260,7 +269,9 @@ class PlaySessionService:
         play_session = await self._play_sessions.get(live.session_id)
         if play_session is None:  # pragma: no cover - sessions are never deleted
             raise SessionNotFoundError(f"Session {live.session_id} does not exist")
-        complete = self._with_unsung_lines(live.lines, live.pitch, live.results)
+        complete = self._with_unsung_lines(
+            live.lines, live.pitch, live.results, live.scoring
+        )
         summary = summarize_session([complete[i] for i in sorted(complete)])
         await self._play_sessions.finish(
             play_session,
@@ -301,7 +312,12 @@ class PlaySessionService:
         }
         finished = play_session.status is PlaySessionStatus.FINISHED
         results = (
-            self._with_unsung_lines(lines, PitchCurve.model_validate(raw_pitch), sung)
+            self._with_unsung_lines(
+                lines,
+                PitchCurve.model_validate(raw_pitch),
+                sung,
+                scoring_config(play_session.difficulty, self._scoring),
+            )
             if finished
             else sung
         )
@@ -311,6 +327,7 @@ class PlaySessionService:
             song_id=play_session.song_id,
             analysis_id=play_session.analysis_id,
             player_name=play_session.player_name,
+            difficulty=play_session.difficulty,
             status=play_session.status,
             started_at=play_session.started_at,
             finished_at=play_session.finished_at,
@@ -322,7 +339,7 @@ class PlaySessionService:
         """Start a play session on the current analysis of a playable song.
 
         Args:
-            request: Song, player name and measured latency.
+            request: Song, player name, measured latency and difficulty.
 
         Returns:
             The session and what will be sung.
@@ -341,6 +358,7 @@ class PlaySessionService:
             analysis_id,
             request.player_name,
             request.latency_offset_ms,
+            request.difficulty,
         )
         await self._session.commit()
         return SessionCreated(
@@ -351,6 +369,7 @@ class PlaySessionService:
             line_count=playable.line_count,
             player_name=play_session.player_name,
             latency_offset_ms=play_session.latency_offset_ms,
+            difficulty=play_session.difficulty,
         )
 
 

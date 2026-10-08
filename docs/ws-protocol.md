@@ -7,16 +7,25 @@ text frames. Schemas live in `backend/app/schemas/sessions.py`.
 
 ```http
 POST /sessions
-{"song_id": "<uuid>", "player_name": "Ana", "latency_offset_ms": 120}
+{"song_id": "<uuid>", "player_name": "Ana", "latency_offset_ms": 120,
+ "difficulty": "normal"}
 ```
 
 `latency_offset_ms` is the audio latency measured by the client's calibration
 (positive: the voice arrives late, e.g. Bluetooth headphones). Range -500..1000.
 
+`difficulty` (optional, default `normal`) sets the pitch tolerance:
+
+| Level | Full credit within | No credit from |
+|---|---|---|
+| `easy` | 1 semitone | 3 semitones |
+| `normal` | 3/4 semitone | 2.5 semitones |
+| `hard` | 1/2 semitone | 2 semitones |
+
 ```json
 201 {"session_id": "<uuid>", "song_id": "<uuid>", "analysis_id": "<uuid>",
      "analysis_version": 1, "line_count": 64, "player_name": "Ana",
-     "latency_offset_ms": 120}
+     "latency_offset_ms": 120, "difficulty": "normal"}
 ```
 
 The session is bound to `analysis_id`: lyrics and timings come from
@@ -95,7 +104,7 @@ scorable. Reconnecting to a finished session closes with `4409`.
 GET /sessions/{session_id}/results
 ```
 
-Returns the session (`status`, `started_at`, `finished_at`), its `totals` (same fields
+Returns the session (`difficulty`, `status`, `started_at`, `finished_at`), its `totals` (same fields
 as `session_summary`) and one entry per line: `line_index`, `text`, `sung`,
 `scorable`, `score`, `accuracy`, `hit`. While the session is active, totals cover the
 lines sung so far and unsung lines have null results; once finished, unsung lines
@@ -118,5 +127,6 @@ Errors never close the connection:
 ## Scoring in short
 
 Pitch is compared in semitones, ignoring whole-octave differences; DTW tolerates
-late entries and small rhythm variations (up to 200 ms). Full credit within half a
-semitone, none from 2 semitones. Details: `backend/README.md`, "Scoring engine".
+late entries and small rhythm variations (up to 200 ms). Credit decreases linearly
+between the two tolerances of the session's difficulty (above). Details:
+`backend/README.md`, "Scoring engine".

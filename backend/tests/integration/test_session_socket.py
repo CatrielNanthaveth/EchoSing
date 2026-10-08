@@ -102,7 +102,10 @@ def pitch_message(line_index: int, f0_hz: list[float]) -> str:
 
 
 async def start_session(
-    client: AsyncClient, song_id: uuid.UUID, latency_ms: int = 0
+    client: AsyncClient,
+    song_id: uuid.UUID,
+    latency_ms: int = 0,
+    difficulty: str = "hard",
 ) -> str:
     response = await client.post(
         "/sessions",
@@ -110,6 +113,7 @@ async def start_session(
             "song_id": str(song_id),
             "player_name": "Ana",
             "latency_offset_ms": latency_ms,
+            "difficulty": difficulty,
         },
     )
     session_id: str = response.json()["session_id"]
@@ -186,6 +190,32 @@ async def test_detuned_line_scores_lower_and_breaks_the_streak(
 
     assert detuned["score"] < 20
     assert (detuned["hit"], detuned["streak"]) == (False, 0)
+
+
+@pytest.mark.parametrize(
+    ("difficulty", "expected"),
+    [("easy", 100.0), ("normal", 85.71), ("hard", 66.67)],
+)
+async def test_line_one_semitone_off_scores_by_difficulty(
+    ws_app: FastAPI,
+    song_id: uuid.UUID,
+    analysis_json: dict[str, Any],
+    difficulty: str,
+    expected: float,
+) -> None:
+    async with open_client(ws_app) as client:
+        session_id = await start_session(client, song_id, difficulty=difficulty)
+        async with connect(client, session_id) as ws:
+            await receive(ws)
+            await ws.send_text(
+                pitch_message(0, sung_line(analysis_json, 0, semitones=-1.0))
+            )
+            flat = await receive(ws)
+        body = (await client.get(f"/sessions/{session_id}/results")).json()
+
+    assert flat["score"] == pytest.approx(expected, abs=0.01)
+    assert body["difficulty"] == difficulty
+    assert body["lines"][0]["score"] == flat["score"]
 
 
 async def test_session_latency_is_compensated(
