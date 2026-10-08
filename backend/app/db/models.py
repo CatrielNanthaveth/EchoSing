@@ -190,4 +190,7 @@ class LineScore(Base):
     hit: Mapped[bool]
     # Sung reference frames of the line: its weight in the session totals.
     voiced_frames: Mapped[int] = mapped_column(default=0, server_default="0")
+    # Pitch the player sang, as sent ({"hop_ms", "f0_hz"}), to analyze the line
+    # again later. Deferred: only the line analysis needs it.
+    sung_pitch: Mapped[dict[str, Any] | None] = mapped_column(deferred=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

@@ -172,6 +172,14 @@ async def test_perfect_lines_score_100_and_build_a_streak(
         (1, 100.0, True),
     ]
     assert all(r.voiced_frames > 0 for r in rows)
+    stored = await PlaySessionRepository(db_session).get_line_score(
+        uuid.UUID(session_id), 0
+    )
+    assert stored is not None
+    assert stored.sung_pitch == {
+        "hop_ms": HOP_MS,
+        "f0_hz": sung_line(analysis_json, 0),
+    }
 
 
 async def test_detuned_line_scores_lower_and_breaks_the_streak(

@@ -3,9 +3,11 @@
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import undefer
 
 from app.db.models import LineScore, PlaySession, SongAnalysis
 from app.domain.enums import Difficulty, PlaySessionStatus
@@ -101,6 +103,7 @@ class PlaySessionRepository:
         *,
         scorable: bool = True,
         voiced_frames: int = 0,
+        sung_pitch: dict[str, Any] | None = None,
     ) -> LineScore:
         """Record the score of one lyric line.
 
@@ -113,6 +116,7 @@ class PlaySessionRepository:
             hit: Whether the line counts towards the streak.
             scorable: Whether the reference had enough singing to score it.
             voiced_frames: Sung reference frames (weight in session totals).
+            sung_pitch: Pitch the player sang, as sent by the client.
 
         Returns:
             The persisted line score.
@@ -129,6 +133,7 @@ class PlaySessionRepository:
             accuracy=accuracy,
             hit=hit,
             voiced_frames=voiced_frames,
+            sung_pitch=sung_pitch,
         )
         self._session.add(line_score)
         await self._session.flush()
@@ -156,6 +161,28 @@ class PlaySessionRepository:
         play_session.status = PlaySessionStatus.FINISHED
         play_session.finished_at = datetime.now(UTC)
         await self._session.flush()
+
+    async def get_line_score(
+        self, session_id: uuid.UUID, line_index: int
+    ) -> LineScore | None:
+        """Fetch the score of one line, including the pitch that was sung.
+
+        Args:
+            session_id: Id of the play session.
+            line_index: Zero-based index of the line.
+
+        Returns:
+            The line score, or None if the line was not sung in the session.
+        """
+        result = await self._session.scalars(
+            select(LineScore)
+            .options(undefer(LineScore.sung_pitch))
+            .where(
+                LineScore.session_id == session_id,
+                LineScore.line_index == line_index,
+            )
+        )
+        return result.one_or_none()
 
     async def list_line_scores(self, session_id: uuid.UUID) -> Sequence[LineScore]:
         """List the scores of a play session ordered by line.

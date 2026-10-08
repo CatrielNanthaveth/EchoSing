@@ -150,6 +150,18 @@ class FinishMessage(BaseModel):
     type: Literal["finish"]
 
 
+class SungPitch(BaseModel):
+    """Pitch the player sang over one line, as stored for later analysis.
+
+    Attributes:
+        hop_ms: Time between frames.
+        f0_hz: Pitch per frame from the line start, 0 where unvoiced.
+    """
+
+    hop_ms: float
+    f0_hz: list[float]
+
+
 ClientMessage = Annotated[LinePitchMessage | FinishMessage, Field(discriminator="type")]
 """Any message a client may send."""
 

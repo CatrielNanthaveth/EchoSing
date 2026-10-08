@@ -26,6 +26,7 @@ from app.schemas.sessions import (
     SessionCreated,
     SessionResults,
     SessionTotals,
+    SungPitch,
 )
 from app.scoring.difficulty import scoring_config
 from app.scoring.line_score import LineResult, ScoringConfig, score_line
@@ -211,6 +212,9 @@ class PlaySessionService:
                 result.hit,
                 scorable=result.scorable,
                 voiced_frames=result.voiced_frames,
+                sung_pitch=SungPitch(
+                    hop_ms=message.hop_ms, f0_hz=message.f0_hz
+                ).model_dump(),
             )
             await self._session.commit()
         except IntegrityError as error:  # scored concurrently by another socket

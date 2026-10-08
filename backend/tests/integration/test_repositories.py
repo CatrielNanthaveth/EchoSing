@@ -2,7 +2,7 @@ import uuid
 from typing import Any
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, inspect, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -213,6 +213,31 @@ async def test_line_scores_are_listed_by_line(db_session: AsyncSession) -> None:
 
     scores = await repo.list_line_scores(play.id)
     assert [s.line_index for s in scores] == [0, 1]
+
+
+async def test_sung_pitch_is_stored_but_only_loaded_on_demand(
+    db_session: AsyncSession,
+) -> None:
+    song = await SongRepository(db_session).add("Song", "Artist")
+    analysis = await SongAnalysisRepository(db_session).add_version(song.id, 1, {})
+    repo = PlaySessionRepository(db_session)
+    play = await repo.add(analysis, player_name="Ana")
+    sung = {"hop_ms": 10.667, "f0_hz": [0.0, 220.5, 221.0]}
+    await repo.add_line_score(
+        play.id, 0, score=50.0, accuracy=0.5, hit=True, sung_pitch=sung
+    )
+    await repo.add_line_score(play.id, 1, score=60.0, accuracy=0.6, hit=True)
+    db_session.expunge_all()
+
+    listed = await repo.list_line_scores(play.id)
+    assert all("sung_pitch" in inspect(row).unloaded for row in listed)
+    db_session.expunge_all()
+
+    first = await repo.get_line_score(play.id, 0)
+    second = await repo.get_line_score(play.id, 1)
+    assert first is not None and first.sung_pitch == sung
+    assert second is not None and second.sung_pitch is None
+    assert await repo.get_line_score(play.id, 2) is None
 
 
 async def test_line_cannot_be_scored_twice(db_session: AsyncSession) -> None:
