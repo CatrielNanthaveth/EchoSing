@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api } from "../api/client";
-import type { LineAnalysis, LyricLine, SongDetail } from "../api/types";
+import type { LineAnalysis, LyricLine, PitchResponse, SongDetail } from "../api/types";
 import { getAudioContext, loadTrack, outputLatencyMs } from "../audio/context";
 import { HOP_SIZE } from "../audio/frameAnalyzer";
+import { playGuide } from "../audio/guideTone";
 import { Microphone, microphoneErrorMessage } from "../audio/microphone";
 import { Playback } from "../audio/playback";
 import { hzToMidi } from "../lib/pitch";
@@ -29,7 +30,11 @@ export interface Practice {
   voice: React.RefObject<VoicePoint[]>;
   /** Song time being heard (ms), or null when not playing. */
   clock: (() => number) | null;
-  start: (line: LyricLine) => Promise<void>;
+  /** Start looping a line; its reference pitch is needed for the guide. */
+  start: (line: LyricLine, reference: PitchResponse | null) => Promise<void>;
+  /** Whether a guide melody plays with each attempt (from the next one). */
+  guide: boolean;
+  setGuide: (on: boolean) => void;
   /** Stop looping; the last result stays visible. */
   stop: () => void;
   /** Stop and forget the attempts (e.g. another line was chosen). */
@@ -49,6 +54,11 @@ export function usePractice(
   const [history, setHistory] = useState<(number | null)[]>([]);
   const [last, setLast] = useState<LineAnalysis | null>(null);
   const [clock, setClock] = useState<(() => number) | null>(null);
+  const [guide, setGuide] = useState(false);
+  const guideReference = useRef<{ on: boolean; pitch: PitchResponse | null }>({
+    on: false,
+    pitch: null,
+  });
   const voice = useRef<VoicePoint[]>([]);
   const loop = useRef<PracticeLoop | null>(null);
   const mic = useRef<Microphone | null>(null);
@@ -56,6 +66,7 @@ export function usePractice(
 
   useEffect(() => {
     settings.current = { latencyMs, difficulty };
+    guideReference.current.on = guide;
   });
 
   useEffect(
@@ -97,6 +108,12 @@ export function usePractice(
         }
         setPhase(next);
       },
+      onAttemptStart: (lineStartAt) => {
+        const { on, pitch } = guideReference.current;
+        return on && pitch !== null
+          ? playGuide(context, pitch, lineStartAt)
+          : undefined;
+      },
       onVoice: (songMs, f0) => {
         // Show the voice where it was sung, not where it arrived.
         voice.current.push({
@@ -109,7 +126,8 @@ export function usePractice(
   }, [song.id, song.analysis_id]);
 
   const start = useCallback(
-    async (line: LyricLine) => {
+    async (line: LyricLine, reference: PitchResponse | null) => {
+      guideReference.current.pitch = reference;
       setHistory([]);
       setLast(null);
       setPhase({ name: "loading" });
@@ -143,5 +161,7 @@ export function usePractice(
     start,
     stop,
     clear,
+    guide,
+    setGuide,
   };
 }

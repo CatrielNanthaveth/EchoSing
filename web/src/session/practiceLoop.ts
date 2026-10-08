@@ -27,6 +27,11 @@ export interface PracticeLoopDeps {
   onPhase: (phase: LoopPhase) => void;
   /** Every microphone frame while singing, on the song timeline (live chart). */
   onVoice?: (songMs: number, f0: number) => void;
+  /**
+   * Called when an attempt starts playing, with the AudioContext time of the
+   * line start (e.g. to play a guide melody); may return a cleanup.
+   */
+  onAttemptStart?: (lineStartAt: number) => (() => void) | undefined;
 }
 
 /**
@@ -40,6 +45,7 @@ export class PracticeLoop {
   /** Bumped on stop/restart: callbacks of an older run are ignored. */
   #run = 0;
   #unsubscribe: (() => void) | null = null;
+  #endAttempt: (() => void) | null = null;
   #timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(deps: PracticeLoopDeps) {
@@ -69,6 +75,8 @@ export class PracticeLoop {
   #release(): void {
     this.#unsubscribe?.();
     this.#unsubscribe = null;
+    this.#endAttempt?.();
+    this.#endAttempt = null;
     if (this.#timer !== null) clearTimeout(this.#timer);
     this.#timer = null;
   }
@@ -103,6 +111,8 @@ export class PracticeLoop {
       },
       { fromMs, durationMs: line.end_ms + LINE_TAIL_MS + OUTRO_MS - fromMs },
     );
+    this.#endAttempt =
+      this.#deps.onAttemptStart?.(playback.startedAt + line.start_ms / 1000) ?? null;
     onPhase({ name: "playing", attempt });
   }
 

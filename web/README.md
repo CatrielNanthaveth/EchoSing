@@ -30,6 +30,11 @@ npm run dev            # http://localhost:5173
 In the results, each sung line opens a **practice** panel: advice (flat/sharp, late/
 early), a chart of the melody vs your voice and a per-word table.
 
+**Live practice** (`/songs/{id}/practica`, "Practicar un verso" on the song page or
+"Practicar este verso" in the results): loops one line with a 2 s count-in, draws the
+melody and your voice live, scores every attempt (nothing is stored) and keeps the
+history; an optional guide melody plays the line's notes (use headphones).
+
 **Admin diagnostics** (not linked from the app): replace `/sessions/{id}/results` with
 `/admin/sesiones/{id}` and enter the API's `ECHOSING_ADMIN_TOKEN` (kept in this
 browser). Per line it shows the voice before the latency compensation, words with

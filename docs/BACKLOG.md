@@ -221,7 +221,16 @@ Una canción es *jugable* si tiene análisis actual e instrumental, sin importar
 - [x] **US-7.3** Diagnóstico solo admin (`/admin/sesiones/{id}`, `X-Admin-Token` hasta que
   haya roles): voz sin compensar latencia, palabras sin voz en la original (desfase de
   letra), tiempos por palabra, parámetros, modelos y descarga JSON.
-- [ ] **E8 (propuesta):** modo práctica en vivo: repetir un verso en loop mientras se canta.
+
+## E8 — Práctica en vivo
+
+- [x] **US-8.1** `POST /songs/{id}/lines/{n}/attempt`: puntúa un intento sin guardarlo.
+- [x] **US-8.2** Loop de un verso: entrada de 2 s, captura hasta `end_ms + 300 ms`,
+  puntaje del intento, pausa y repetición.
+- [x] **US-8.3** Página `/songs/{id}/practica?verso=N`: melodía y voz en vivo (canvas),
+  resultado e historial de intentos; accesos desde la canción y los resultados.
+- [x] **US-8.4** Melodía guía opcional (oscilador que sigue la referencia).
+- [ ] Propuesta: practicar un rango de versos; bajar la velocidad sin cambiar el tono.
 
 ## Fuera del MVP
 

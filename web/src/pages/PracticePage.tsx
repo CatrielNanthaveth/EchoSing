@@ -147,12 +147,29 @@ function LinePractice({
             type="button"
             className="primary"
             disabled={phase.name === "loading" || reference.status !== "success"}
-            onClick={() => void practice.start(line)}
+            onClick={() =>
+              void practice.start(
+                line,
+                reference.status === "success" ? reference.data : null,
+              )
+            }
           >
             {phase.name === "loading" ? "Preparando…" : "Practicar este verso"}
           </button>
         )}
       </div>
+
+      <label className="practice-toggle">
+        <input
+          type="checkbox"
+          checked={practice.guide}
+          onChange={(event) => {
+            practice.setGuide(event.target.checked);
+          }}
+        />{" "}
+        Escuchar la melodía guía (usá auriculares: con parlantes el micrófono la
+        confunde con tu voz)
+      </label>
 
       <p className="practice-status muted" role="status">
         {phase.name === "playing" &&

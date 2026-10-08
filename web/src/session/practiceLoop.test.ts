@@ -30,6 +30,7 @@ function setup(
     stop: vi.fn(),
     // Context time == song time in seconds, to keep the arithmetic simple.
     songTimeAt: (contextTime: number) => contextTime * 1000,
+    startedAt: 0,
   };
   const phases: LoopPhase[] = [];
   const voice: [number, number][] = [];
@@ -167,5 +168,29 @@ describe("PracticeLoop", () => {
       expect(phases.at(-1)).toEqual({ name: "error", message: "HTTP 500" });
     });
     expect(loop.running).toBe(false);
+  });
+
+  it("runs a hook with each attempt, at the line start, and cleans it up", () => {
+    const stopGuide = vi.fn();
+    const onAttemptStart = vi.fn(() => stopGuide);
+    const loop = new PracticeLoop({
+      playback: {
+        start: vi.fn(),
+        stop: vi.fn(),
+        songTimeAt: (t: number) => t * 1000,
+        startedAt: 2, // song time 0 plays at context time 2 s
+      } as unknown as Playback,
+      microphone: { subscribe: () => () => undefined } as unknown as Microphone,
+      hopMs: HOP,
+      score: () => Promise.resolve(lineAnalysis()),
+      onPhase: () => undefined,
+      onAttemptStart,
+    });
+
+    loop.start(LINE);
+    expect(onAttemptStart).toHaveBeenCalledWith(2 + 10);
+
+    loop.stop();
+    expect(stopGuide).toHaveBeenCalledOnce();
   });
 });
