@@ -733,3 +733,23 @@ a.button.primary {
 .admin-params dd {
   margin: 0;
 }
+
+.mic-test {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.mic-test h2 {
+  margin-top: 0;
+}
+
+.mic-test-prompt {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.mic-test-results .admin-table {
+  margin: 0.5rem 0 1rem;
+}

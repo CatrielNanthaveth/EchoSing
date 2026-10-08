@@ -112,7 +112,8 @@ async function startSinging() {
 function sing(fromS: number, toS: number, f0: number) {
   act(() => {
     for (let time = fromS; time < toS; time += 0.01) {
-      for (const listener of listeners) listener({ time, rms: 0.1, f0, clarity: 0.9 });
+      for (const listener of listeners)
+        listener({ time, rms: 0.1, f0, clarity: 0.9, windowRms: 0.1, gated: false });
     }
   });
 }

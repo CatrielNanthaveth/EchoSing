@@ -3,6 +3,7 @@ import { Link } from "react-router";
 
 import { getAudioContext } from "../audio/context";
 import { Microphone, microphoneErrorMessage } from "../audio/microphone";
+import { MicTest } from "../components/MicTest";
 import { MIN_MATCHED, type CalibrationResult } from "../calibration/detect";
 import { BEEP_COUNT, calibrate } from "../calibration/run";
 import { useAnimationFrame } from "../hooks/useAnimationFrame";
@@ -33,13 +34,19 @@ export function CalibrationPage() {
     [],
   );
 
+  /** The microphone, opened once and shared with the microphone test. */
+  const getMicrophone = async () => {
+    const context = getAudioContext();
+    await context.resume();
+    microphone.current ??= await Microphone.open(context);
+    return microphone.current;
+  };
+
   const start = async () => {
     setPhase({ name: "listening", beepTimes: null });
-    const context = getAudioContext();
     try {
-      await context.resume();
-      microphone.current ??= await Microphone.open(context);
-      const result = await calibrate(context, microphone.current, (beepTimes) => {
+      const mic = await getMicrophone();
+      const result = await calibrate(getAudioContext(), mic, (beepTimes) => {
         setPhase({ name: "listening", beepTimes });
       });
       setPhase({ name: "result", result });
@@ -133,6 +140,8 @@ export function CalibrationPage() {
           <button type="submit">Guardar</button>
         </form>
       </details>
+
+      <MicTest getMicrophone={getMicrophone} />
 
       <p>
         <Link to="/">Volver al catálogo</Link>

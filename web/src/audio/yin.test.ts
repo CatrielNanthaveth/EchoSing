@@ -72,6 +72,16 @@ describe("Yin", () => {
     expect(yin.estimate(tone(0, { harmonics: [], noise: 1 })).f0).toBe(0);
   });
 
+  it("tells how periodic an unvoiced window was", () => {
+    // Too noisy for the threshold, but still somewhat periodic.
+    const noisy = yin.estimate(tone(220, { noise: 1.2 }));
+    const noise = yin.estimate(tone(0, { harmonics: [], noise: 1 }));
+
+    expect(noisy.f0).toBe(0);
+    expect(noisy.clarity).toBeGreaterThan(noise.clarity);
+    expect(noisy.clarity).toBeLessThan(0.85);
+  });
+
   it("ignores pitches outside the search range", () => {
     const narrow = new Yin(RATE, SIZE, { minHz: 150, maxHz: 500 });
 

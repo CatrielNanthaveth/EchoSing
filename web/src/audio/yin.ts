@@ -2,7 +2,10 @@
 export interface PitchEstimate {
   /** Fundamental frequency in Hz, 0 if unvoiced. */
   f0: number;
-  /** 0-1: how periodic the window is (1 - YIN aperiodicity). */
+  /**
+   * 0-1: how periodic the window is (1 - YIN aperiodicity); also reported
+   * when unvoiced (how close it came to the threshold).
+   */
   clarity: number;
 }
 
@@ -15,7 +18,8 @@ export interface YinOptions {
   threshold?: number;
 }
 
-const UNVOICED: PitchEstimate = { f0: 0, clarity: 0 };
+/** Default aperiodicity threshold (clarity above 1 - this is voiced). */
+export const YIN_THRESHOLD = 0.15;
 
 /**
  * YIN pitch detector (de Cheveigné & Kawahara, 2002).
@@ -33,7 +37,7 @@ export class Yin {
   readonly #cmnd: Float32Array;
 
   constructor(sampleRate: number, windowSize: number, options: YinOptions = {}) {
-    const { minHz = 70, maxHz = 1000, threshold = 0.15 } = options;
+    const { minHz = 70, maxHz = 1000, threshold = YIN_THRESHOLD } = options;
     this.#sampleRate = sampleRate;
     this.#integration = windowSize >> 1;
     this.#minPeriod = Math.max(2, Math.floor(sampleRate / maxHz));
@@ -62,14 +66,18 @@ export class Yin {
 
     // Step 4: first dip under the threshold, followed to its local minimum.
     let period = -1;
+    let lowest = 1;
     for (let tau = this.#minPeriod; tau < last; tau++) {
-      if ((cmnd[tau] ?? 1) < this.#threshold) {
+      const value = cmnd[tau] ?? 1;
+      if (value < lowest) lowest = value;
+      if (value < this.#threshold) {
         while (tau + 1 < last && (cmnd[tau + 1] ?? 1) < (cmnd[tau] ?? 1)) tau++;
         period = tau;
         break;
       }
     }
-    if (period < 0) return UNVOICED;
+    // Unvoiced: still report how periodic it was (diagnostics, tuning).
+    if (period < 0) return { f0: 0, clarity: Math.max(0, 1 - lowest) };
 
     // Step 5: parabolic interpolation for a sub-sample period.
     const before = cmnd[period - 1] ?? 1;

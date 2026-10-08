@@ -21,6 +21,8 @@ function recording(
       rms: clap ? 0.3 : noise * (1 + (i % 3) / 2),
       f0: 0,
       clarity: 0,
+      windowRms: 0.1,
+      gated: false,
     });
   }
   return frames;

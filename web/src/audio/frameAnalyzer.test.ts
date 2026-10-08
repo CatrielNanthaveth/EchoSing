@@ -71,6 +71,9 @@ describe("FrameAnalyzer pitch", () => {
     const silent = frames.filter((frame) => frame.time < 0.2);
     const sung = frames.filter((frame) => frame.time > 0.3);
     expect(silent.every((frame) => frame.f0 === 0 && frame.clarity === 0)).toBe(true);
+    expect(silent.every((frame) => frame.gated && frame.windowRms === 0)).toBe(true);
     expect(sung.every((frame) => Math.abs(frame.f0 - 220) < 1)).toBe(true);
+    expect(sung.every((frame) => !frame.gated)).toBe(true);
+    expect(sung[0]?.windowRms).toBeCloseTo(0.3 / Math.SQRT2, 2);
   });
 });

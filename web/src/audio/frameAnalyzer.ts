@@ -19,8 +19,12 @@ export interface VoiceFrame {
   rms: number;
   /** Pitch in Hz, 0 when unvoiced or silent. */
   f0: number;
-  /** 0-1 periodicity of the window (0 when silent). */
+  /** 0-1 periodicity of the window, also when unvoiced (0 when silent). */
   clarity: number;
+  /** RMS level of the whole window (what the silence gate compares). */
+  windowRms: number;
+  /** Whether the window was below the silence gate (no pitch search). */
+  gated: boolean;
 }
 
 /**
@@ -90,13 +94,16 @@ export class FrameAnalyzer {
       energy += sample * sample;
       if (i >= hopStart && i < hopStart + this.#hopSize) hopEnergy += sample * sample;
     }
-    const silent = Math.sqrt(energy / size) < SILENCE_RMS;
-    const pitch = silent ? { f0: 0, clarity: 0 } : this.#yin.estimate(this.#window);
+    const windowRms = Math.sqrt(energy / size);
+    const gated = windowRms < SILENCE_RMS;
+    const pitch = gated ? { f0: 0, clarity: 0 } : this.#yin.estimate(this.#window);
     this.#emit({
       time: centerFrame / this.#sampleRate,
       rms: Math.sqrt(hopEnergy / this.#hopSize),
       f0: pitch.f0,
       clarity: pitch.clarity,
+      windowRms,
+      gated,
     });
   }
 }
