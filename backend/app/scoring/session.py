@@ -1,6 +1,6 @@
 """Aggregate line results into the score of a whole performance."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 from pydantic import BaseModel
@@ -83,3 +83,29 @@ def summarize_session(lines: Sequence[LineResult]) -> SessionSummary:
         scored_lines=len(scorable),
         hit_lines=sum(hits),
     )
+
+
+def current_streak(results: Mapping[int, LineResult], line_index: int) -> int:
+    """Consecutive hits ending at a line, as shown live after singing it.
+
+    Walking back from ``line_index``: hits extend the streak, lines that are
+    not scorable are skipped, and a miss or a line that was not sung ends it.
+
+    Args:
+        results: Results of the lines sung so far, by line index.
+        line_index: Line just sung.
+
+    Returns:
+        The streak length (0 if that line is not a hit).
+    """
+    streak = 0
+    for index in range(line_index, -1, -1):
+        result = results.get(index)
+        if result is None:
+            break
+        if not result.scorable:
+            continue
+        if not result.hit:
+            break
+        streak += 1
+    return streak

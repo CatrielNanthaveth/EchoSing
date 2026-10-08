@@ -239,3 +239,12 @@ def test_without_warp_limit() -> None:
 def test_invalid_credit_range_is_rejected() -> None:
     with pytest.raises(ValidationError):
         ScoringConfig(full_credit_semitones=2.0, zero_credit_semitones=1.0)
+
+
+def test_singing_past_the_line_end_is_ignored() -> None:
+    rng = np.random.default_rng(9)
+    tail = rng.uniform(40, 80, size=30)  # 300 ms of noise after the line
+
+    result = score_line(reference_curve(), to_hz(np.concatenate((MELODY, tail))), HOP)
+
+    assert result.score == 100.0

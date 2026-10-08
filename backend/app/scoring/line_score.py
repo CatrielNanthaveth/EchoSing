@@ -95,6 +95,10 @@ def score_line(
 ) -> LineResult:
     """Score a sung line against the reference pitch of that line.
 
+    Both curves start at the line start. Clients should send a little more
+    than the line (e.g. 300 ms) so the latency compensation has frames to
+    shift in; anything past the line end is ignored.
+
     Steps: convert the singer's pitch to MIDI, undo the measured latency,
     resample both curves to ``scoring_hop_ms``, align them with DTW (so small
     rhythm differences are not penalized) and give each sung reference frame
@@ -136,6 +140,9 @@ def score_line(
         sung_hop_ms,
         hop,
     )
+    # Both curves start at the line start; once the latency is undone, singing
+    # past the end of the line is dropped so both cover the same time span.
+    sung = sung[: reference_midi.size]
     errors = _frame_errors(reference_midi[voiced], sung, settings)
 
     credit = np.clip(

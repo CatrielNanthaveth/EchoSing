@@ -87,6 +87,7 @@ concurrency = ["greenlet", "thread"]
 dev = [
     "celery-types>=0.26.0",
     "httpx>=0.28.1",
+    "httpx-ws>=0.9.0",
     "mypy>=2.4.0",
     "pre-commit>=4.6.2",
     "pytest>=9.1.1",

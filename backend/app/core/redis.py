@@ -1,7 +1,7 @@
 """Redis client factory and FastAPI dependency."""
 
-from fastapi import Request
 from redis.asyncio import Redis
+from starlette.requests import HTTPConnection
 
 
 def create_redis_client(url: str) -> Redis:
@@ -20,11 +20,11 @@ def create_redis_client(url: str) -> Redis:
     return client
 
 
-def get_redis(request: Request) -> Redis:
+def get_redis(request: HTTPConnection) -> Redis:
     """Provide the application-wide Redis client.
 
     Args:
-        request: Incoming request, used to reach the application state.
+        request: Incoming request or WebSocket, used to reach the app state.
 
     Returns:
         The Redis client created during application startup.

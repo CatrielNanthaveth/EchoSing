@@ -1,7 +1,7 @@
 import pytest
 
 from app.scoring.line_score import LineResult
-from app.scoring.session import longest_run, summarize_session
+from app.scoring.session import current_streak, longest_run, summarize_session
 
 
 def line(score: float, frames: int = 100, hit_threshold: float = 60) -> LineResult:
@@ -80,3 +80,28 @@ def test_perfect_performance() -> None:
         1.0,
         3,
     )
+
+
+def test_current_streak_counts_back_from_the_line() -> None:
+    results = {0: line(90), 1: line(20), 2: line(80), 3: line(70)}
+
+    assert current_streak(results, 3) == 2
+    assert current_streak(results, 1) == 0
+    assert current_streak(results, 0) == 1
+
+
+def test_current_streak_skips_lines_that_are_not_scorable() -> None:
+    results = {0: line(90), 1: NOT_SCORABLE, 2: line(80)}
+
+    assert current_streak(results, 2) == 2
+    assert current_streak(results, 1) == 1
+
+
+def test_unsung_line_ends_the_current_streak() -> None:
+    results = {0: line(90), 2: line(80)}  # line 1 was not sung
+
+    assert current_streak(results, 2) == 1
+
+
+def test_current_streak_of_an_unknown_line_is_zero() -> None:
+    assert current_streak({}, 4) == 0

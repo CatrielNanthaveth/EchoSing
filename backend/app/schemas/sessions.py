@@ -1,6 +1,8 @@
-"""Schemas of play sessions (REST)."""
+"""Schemas of play sessions: REST bodies and WebSocket messages."""
 
 import uuid
+from enum import StrEnum
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -42,3 +44,90 @@ class SessionCreated(BaseModel):
     line_count: int
     player_name: str
     latency_offset_ms: int
+
+
+# --- WebSocket messages (see docs/ws-protocol.md) ---------------------------------
+
+MAX_PITCH_FRAMES = 6000
+"""At most 60 s of pitch at 10 ms per line message."""
+
+
+class LinePitchMessage(BaseModel):
+    """Client -> server: the pitch the player sang over one line.
+
+    Attributes:
+        type: Message type.
+        line_index: Line that was sung.
+        hop_ms: Time between pitch frames.
+        f0_hz: Pitch per frame in Hz, from the line start (0 = no voice). Send a
+            little more than the line (~300 ms) for latency compensation.
+    """
+
+    type: Literal["line_pitch"]
+    line_index: int = Field(ge=0)
+    hop_ms: float = Field(ge=5, le=50)
+    f0_hz: list[Annotated[float, Field(ge=0, le=5000)]] = Field(
+        max_length=MAX_PITCH_FRAMES
+    )
+
+
+class ReadyMessage(BaseModel):
+    """Server -> client: the session is open and ready to score lines.
+
+    Attributes:
+        type: Message type.
+        session_id: Id of the session.
+        analysis_id: Analysis the lines are scored against.
+        line_count: Number of lyric lines.
+        scored_lines: Lines already scored (when reconnecting).
+    """
+
+    type: Literal["ready"] = "ready"
+    session_id: uuid.UUID
+    analysis_id: uuid.UUID
+    line_count: int
+    scored_lines: list[int]
+
+
+class LineScoreMessage(BaseModel):
+    """Server -> client: the score of a sung line.
+
+    Attributes:
+        type: Message type.
+        line_index: Line that was scored.
+        scorable: False when the line has too little singing to judge.
+        score: 0-100, None if not scorable.
+        accuracy: Fraction of in-tune frames, None if not scorable.
+        hit: Whether the line counts towards the streak.
+        streak: Consecutive hits ending at this line.
+    """
+
+    type: Literal["line_score"] = "line_score"
+    line_index: int
+    scorable: bool
+    score: float | None
+    accuracy: float | None
+    hit: bool
+    streak: int
+
+
+class ErrorCode(StrEnum):
+    """Machine-readable error codes sent over the WebSocket."""
+
+    INVALID_MESSAGE = "invalid_message"
+    UNKNOWN_LINE = "unknown_line"
+    LINE_ALREADY_SCORED = "line_already_scored"
+
+
+class ErrorMessage(BaseModel):
+    """Server -> client: a message could not be processed (connection stays open).
+
+    Attributes:
+        type: Message type.
+        code: What went wrong.
+        detail: Human-readable explanation.
+    """
+
+    type: Literal["error"] = "error"
+    code: ErrorCode
+    detail: str

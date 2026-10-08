@@ -2,13 +2,13 @@
 
 from collections.abc import AsyncIterator
 
-from fastapi import Request
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
+from starlette.requests import HTTPConnection
 
 
 def create_engine(url: str) -> AsyncEngine:
@@ -38,11 +38,11 @@ def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessi
     return async_sessionmaker(engine, expire_on_commit=False)
 
 
-def get_engine(request: Request) -> AsyncEngine:
+def get_engine(request: HTTPConnection) -> AsyncEngine:
     """Provide the application-wide database engine.
 
     Args:
-        request: Incoming request, used to reach the application state.
+        request: Incoming request or WebSocket, used to reach the app state.
 
     Returns:
         The engine created during application startup.
@@ -51,11 +51,11 @@ def get_engine(request: Request) -> AsyncEngine:
     return engine
 
 
-async def get_db_session(request: Request) -> AsyncIterator[AsyncSession]:
+async def get_db_session(request: HTTPConnection) -> AsyncIterator[AsyncSession]:
     """Provide a database session scoped to a single request.
 
     Args:
-        request: Incoming request, used to reach the application state.
+        request: Incoming request or WebSocket, used to reach the app state.
 
     Yields:
         An ``AsyncSession`` that is closed when the request finishes.

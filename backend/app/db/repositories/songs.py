@@ -231,6 +231,27 @@ class SongAnalysisRepository:
         await self._session.flush()
         return analysis
 
+    async def get_reference(
+        self, analysis_id: uuid.UUID
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]] | None:
+        """Fetch the pitch curve and lines of a specific analysis version.
+
+        Args:
+            analysis_id: Id of the analysis (not necessarily the current one).
+
+        Returns:
+            The raw ``pitch`` and ``lines`` values, or None if it does not
+            exist.
+        """
+        row = (
+            await self._session.execute(
+                select(SongAnalysis.data["pitch"], SongAnalysis.data["lines"]).where(
+                    SongAnalysis.id == analysis_id
+                )
+            )
+        ).first()
+        return None if row is None else (row[0], row[1])
+
     async def get_current_identity(
         self, song_id: uuid.UUID
     ) -> tuple[uuid.UUID, int] | None:
