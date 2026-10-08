@@ -5,10 +5,13 @@ from typing import Any
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
+from app.db.models import LineScore, PlaySession
 from app.db.repositories.play_sessions import PlaySessionRepository
+from app.db.repositories.songs import SongAnalysisRepository
 from app.db.session import get_db_session
 from app.main import create_app
 from app.storage.dependencies import get_storage
@@ -217,3 +220,113 @@ async def test_diagnostics_of_unknown_session_is_404(app: FastAPI) -> None:
         )
 
     assert response.status_code == 404
+
+
+# --- live practice attempts ----------------------------------------------------------
+
+
+async def current_analysis_id(db_session: AsyncSession, song_id: uuid.UUID) -> str:
+    identity = await SongAnalysisRepository(db_session).get_current_identity(song_id)
+    assert identity is not None
+    return str(identity[0])
+
+
+@pytest.mark.parametrize(
+    ("semitones", "difficulty", "expected"),
+    [(0.0, "normal", 100.0), (-1.0, "easy", 100.0), (-1.0, "hard", 66.67)],
+)
+async def test_attempt_is_scored_like_a_session_line(
+    app: FastAPI,
+    db_session: AsyncSession,
+    song_id: uuid.UUID,
+    analysis_json: dict[str, Any],
+    semitones: float,
+    difficulty: str,
+    expected: float,
+) -> None:
+    analysis_id = await current_analysis_id(db_session, song_id)
+    async with open_client(app) as client:
+        response = await client.post(
+            f"/songs/{song_id}/lines/1/attempt",
+            json={
+                "analysis_id": analysis_id,
+                "hop_ms": HOP_MS,
+                "f0_hz": sung_line(
+                    analysis_json, 1, semitones=semitones, delay_frames=8
+                ),
+                "latency_offset_ms": 80,
+                "difficulty": difficulty,
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["result"]["score"] == pytest.approx(expected, abs=0.01)
+    assert body["timing_offset_ms"] == 0.0
+    assert body["pitch_offset_semitones"] == semitones
+
+
+async def test_attempt_stores_nothing(
+    app: FastAPI,
+    db_session: AsyncSession,
+    song_id: uuid.UUID,
+    analysis_json: dict[str, Any],
+) -> None:
+    analysis_id = await current_analysis_id(db_session, song_id)
+    async with open_client(app) as client:
+        response = await client.post(
+            f"/songs/{song_id}/lines/0/attempt",
+            json={
+                "analysis_id": analysis_id,
+                "hop_ms": HOP_MS,
+                "f0_hz": sung_line(analysis_json, 0),
+            },
+        )
+
+    assert response.status_code == 200
+    assert await db_session.scalar(select(func.count()).select_from(PlaySession)) == 0
+    assert await db_session.scalar(select(func.count()).select_from(LineScore)) == 0
+
+
+async def test_attempt_needs_an_analysis_of_that_song(
+    app: FastAPI,
+    db_session: AsyncSession,
+    storage: LocalStorage,
+    song_id: uuid.UUID,
+    analysis_json: dict[str, Any],
+) -> None:
+    other = await add_song(db_session, storage, analysis_json, "Other")
+    other_analysis = await current_analysis_id(db_session, other)
+    analysis_id = await current_analysis_id(db_session, song_id)
+    body = {"analysis_id": other_analysis, "hop_ms": HOP_MS, "f0_hz": [220.0]}
+    async with open_client(app) as client:
+        wrong_song = await client.post(f"/songs/{song_id}/lines/0/attempt", json=body)
+        unknown_line = await client.post(
+            f"/songs/{song_id}/lines/7/attempt",
+            json={**body, "analysis_id": analysis_id},
+        )
+
+    assert wrong_song.status_code == 404
+    assert unknown_line.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"hop_ms": 2},
+        {"f0_hz": [220.0] * 6001},
+        {"f0_hz": [-1.0]},
+        {"latency_offset_ms": 2000},
+        {"difficulty": "extreme"},
+    ],
+)
+async def test_invalid_attempts_are_rejected(
+    app: FastAPI, song_id: uuid.UUID, changes: dict[str, object]
+) -> None:
+    body = {"analysis_id": str(uuid.uuid4()), "hop_ms": HOP_MS, "f0_hz": [220.0]}
+    async with open_client(app) as client:
+        response = await client.post(
+            f"/songs/{song_id}/lines/0/attempt", json={**body, **changes}
+        )
+
+    assert response.status_code == 422

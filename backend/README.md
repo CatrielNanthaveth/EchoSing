@@ -282,6 +282,7 @@ instrument overtones, so the instrumental can sound duller where they were remov
 | `WS /ws/sessions/{id}` | Scores each sung line in real time (protocol: `docs/ws-protocol.md`) |
 | `GET /sessions/{id}/results` | Totals and the result of every line |
 | `GET /sessions/{id}/lines/{n}/analysis` | How a line was sung (practice chart): reference vs sung curves, the alignment, timing and pitch offsets |
+| `POST /songs/{id}/lines/{n}/attempt` | Live practice: scores one attempt at a line (`analysis_id`, `hop_ms`, `f0_hz`, latency, difficulty) and returns the same analysis; nothing is stored |
 | `GET /admin/sessions/{id}/lines/{n}/debug` | Admin (`X-Admin-Token`): the analysis plus raw inputs, scoring parameters, analysis version/models and per-word voicing |
 
 The client sends the pitch it measured over each line (`line_pitch`) and gets its

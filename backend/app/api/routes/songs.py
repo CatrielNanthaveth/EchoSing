@@ -8,12 +8,16 @@ from fastapi.responses import StreamingResponse
 
 from app.api.http_range import RangeNotSatisfiableError, parse_range
 from app.schemas.catalog import PitchResponse, SongDetail, SongPage
+from app.schemas.practice import LineAttempt
+from app.scoring.analysis import LineAnalysis
 from app.services.catalog import (
     CatalogService,
     LineNotFoundError,
     get_catalog_service,
 )
 from app.services.errors import SongNotFoundError
+from app.services.play_sessions import UnknownLineError
+from app.services.practice import PracticeService, get_practice_service
 from app.storage.base import StorageBackend
 from app.storage.dependencies import get_storage
 
@@ -93,6 +97,25 @@ async def stream_instrumental(
         media_type=audio.content_type,
         headers=headers,
     )
+
+
+@router.post(
+    "/{song_id}/lines/{line_index}/attempt",
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "Song, analysis or line not found"}
+    },
+)
+async def score_line_attempt(
+    song_id: uuid.UUID,
+    line_index: int,
+    attempt: LineAttempt,
+    service: Annotated[PracticeService, Depends(get_practice_service)],
+) -> LineAnalysis:
+    """Score a practice attempt at one line (live practice); nothing is stored."""
+    try:
+        return await service.score_attempt(song_id, line_index, attempt)
+    except (SongNotFoundError, UnknownLineError) as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
 
 
 @router.get(

@@ -232,24 +232,24 @@ class SongAnalysisRepository:
         return analysis
 
     async def get_reference(
-        self, analysis_id: uuid.UUID
+        self, analysis_id: uuid.UUID, song_id: uuid.UUID | None = None
     ) -> tuple[dict[str, Any], list[dict[str, Any]]] | None:
         """Fetch the pitch curve and lines of a specific analysis version.
 
         Args:
             analysis_id: Id of the analysis (not necessarily the current one).
+            song_id: If given, the analysis must belong to this song.
 
         Returns:
             The raw ``pitch`` and ``lines`` values, or None if it does not
-            exist.
+            exist (for that song).
         """
-        row = (
-            await self._session.execute(
-                select(SongAnalysis.data["pitch"], SongAnalysis.data["lines"]).where(
-                    SongAnalysis.id == analysis_id
-                )
-            )
-        ).first()
+        query = select(SongAnalysis.data["pitch"], SongAnalysis.data["lines"]).where(
+            SongAnalysis.id == analysis_id
+        )
+        if song_id is not None:
+            query = query.where(SongAnalysis.song_id == song_id)
+        row = (await self._session.execute(query)).first()
         return None if row is None else (row[0], row[1])
 
     async def get_metadata(

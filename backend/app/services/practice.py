@@ -17,15 +17,17 @@ from app.db.repositories.songs import SongAnalysisRepository
 from app.db.session import get_db_session
 from app.schemas.analysis import LyricLine, PipelineInfo, PitchCurve
 from app.schemas.practice import (
+    LineAttempt,
     LineDiagnostics,
     LinePractice,
     PracticeWord,
     WordDiagnostics,
 )
 from app.schemas.sessions import SungPitch
-from app.scoring.analysis import analyze_line
+from app.scoring.analysis import LineAnalysis, analyze_line
 from app.scoring.difficulty import scoring_config
 from app.scoring.line_score import ScoringConfig
+from app.services.errors import SongNotFoundError
 from app.services.play_sessions import SessionNotFoundError, UnknownLineError
 from app.services.voicing import voiced_ratios
 
@@ -135,6 +137,50 @@ class PracticeService:
                 )
                 for word, ratio in zip(line.words, ratios, strict=True)
             ],
+        )
+
+    async def score_attempt(
+        self, song_id: uuid.UUID, line_index: int, attempt: LineAttempt
+    ) -> LineAnalysis:
+        """Score a practice attempt at one line; nothing is stored.
+
+        Args:
+            song_id: Song being practiced.
+            line_index: Line sung.
+            attempt: Sung pitch, latency, difficulty and the analysis used.
+
+        Returns:
+            The analysis of the attempt, as for a sung line of a session.
+
+        Raises:
+            SongNotFoundError: If the analysis does not exist for the song.
+            UnknownLineError: If the line does not exist.
+        """
+        reference = await self._analyses.get_reference(attempt.analysis_id, song_id)
+        if reference is None:
+            raise SongNotFoundError(
+                f"Analysis {attempt.analysis_id} of song {song_id} does not exist"
+            )
+        raw_pitch, raw_lines = reference
+        lines = _LINES.validate_python(raw_lines)
+        if not 0 <= line_index < len(lines):
+            raise UnknownLineError(
+                f"Line {line_index} does not exist ({len(lines)} lines)"
+            )
+        line = lines[line_index]
+        pitch = PitchCurve.model_validate(raw_pitch).slice_ms(
+            line.start_ms, line.end_ms
+        )
+        return await asyncio.get_running_loop().run_in_executor(
+            None,
+            partial(
+                analyze_line,
+                pitch,
+                np.asarray(attempt.f0_hz, dtype=np.float64),
+                attempt.hop_ms,
+                latency_ms=attempt.latency_offset_ms,
+                config=scoring_config(attempt.difficulty, self._scoring),
+            ),
         )
 
     async def _load(self, session_id: uuid.UUID, line_index: int) -> _LoadedLine:

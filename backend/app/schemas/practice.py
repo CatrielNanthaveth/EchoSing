@@ -1,19 +1,40 @@
 """Schemas of the line analysis: practice charts and admin diagnostics."""
 
 import uuid
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.domain.enums import Difficulty
 from app.schemas.analysis import PipelineInfo, PitchCurve
-from app.schemas.sessions import SungPitch
+from app.schemas.sessions import MAX_PITCH_FRAMES, SungPitch
 from app.scoring.analysis import LineAnalysis
 from app.scoring.line_score import ScoringConfig
 
 AnalysisStatus = Literal["analyzed", "not_sung", "not_stored"]
 """``not_sung``: the line was not sung; ``not_stored``: sung before curves were
 kept, so it can no longer be analyzed."""
+
+
+class LineAttempt(BaseModel):
+    """A practice attempt at one line, scored but not stored.
+
+    Attributes:
+        analysis_id: Analysis whose lines and pitch the client is using.
+        hop_ms: Time between pitch frames.
+        f0_hz: Pitch per frame in Hz from the line start (0 = no voice), as in
+            the ``line_pitch`` message (send ~300 ms past the line end).
+        latency_offset_ms: Latency measured by the client's calibration.
+        difficulty: Pitch tolerance.
+    """
+
+    analysis_id: uuid.UUID
+    hop_ms: float = Field(ge=5, le=50)
+    f0_hz: list[Annotated[float, Field(ge=0, le=5000)]] = Field(
+        max_length=MAX_PITCH_FRAMES
+    )
+    latency_offset_ms: int = Field(default=0, ge=-500, le=1000)
+    difficulty: Difficulty = Difficulty.NORMAL
 
 
 class PracticeWord(BaseModel):
