@@ -99,3 +99,37 @@ async def transcode_to_mp3(
         ],
         timeout_s=TRANSCODE_TIMEOUT_S,
     )
+
+
+async def transcode_to_wav(
+    source: Path, destination: Path, sample_rate: int = 16_000
+) -> None:
+    """Decode an audio file to mono 16-bit PCM WAV, e.g. for pitch models.
+
+    Args:
+        source: Input audio file.
+        destination: Output WAV file (overwritten if it exists).
+        sample_rate: Output sample rate in Hz.
+
+    Raises:
+        ToolError: If FFmpeg fails.
+    """
+    await run_tool(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-y",
+            "-i",
+            source,
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            str(sample_rate),
+            "-c:a",
+            "pcm_s16le",
+            destination,
+        ],
+        timeout_s=TRANSCODE_TIMEOUT_S,
+    )

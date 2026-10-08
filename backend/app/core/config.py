@@ -40,6 +40,21 @@ class Settings(BaseSettings):
             (skips suspicious segments around silences longer than this, in
             seconds). Disabled by default: on fast sung lyrics it drops real
             words; known hallucinations are filtered after transcription.
+        crepe_model: torchcrepe model capacity (``full`` or ``tiny``).
+        crepe_decoder: torchcrepe decoder (``viterbi``, ``weighted_argmax`` or
+            ``argmax``); viterbi reduces octave jumps.
+        crepe_fmin_hz: Lowest pitch considered.
+        crepe_fmax_hz: Highest pitch considered.
+        crepe_batch_size: Frames per inference batch.
+        pitch_timeout_s: Max seconds one pitch extraction may take.
+        voicing_min_confidence: Confidence (0-100) from which a frame counts as
+            sung, used to detect hallucinated words.
+        hallucination_max_voiced_ratio: Words whose fraction of sung frames is
+            below this count as unvoiced.
+        hallucination_min_run_words: Consecutive unvoiced words needed to treat
+            them as a hallucinated phrase (isolated ones are common in rap).
+        hallucination_voicing_filter: Whether hallucinated phrases are
+            discarded from the transcription (otherwise only reported).
     """
 
     model_config = SettingsConfigDict(
@@ -65,6 +80,16 @@ class Settings(BaseSettings):
     whisper_model: str = "large-v3-turbo"
     transcription_timeout_s: float = Field(default=900.0, gt=0)
     whisper_hallucination_silence_s: float | None = Field(default=None, gt=0)
+    crepe_model: str = "full"
+    crepe_decoder: str = "viterbi"
+    crepe_fmin_hz: float = Field(default=65.0, gt=0)
+    crepe_fmax_hz: float = Field(default=1100.0, gt=0)
+    crepe_batch_size: int = Field(default=1024, gt=0)
+    pitch_timeout_s: float = Field(default=900.0, gt=0)
+    voicing_min_confidence: int = Field(default=50, ge=0, le=100)
+    hallucination_max_voiced_ratio: float = Field(default=0.05, ge=0, le=1)
+    hallucination_min_run_words: int = Field(default=3, ge=1)
+    hallucination_voicing_filter: bool = True
 
 
 @lru_cache

@@ -120,11 +120,15 @@ EchoSing/
   `align_lyrics` (difflib): texto y versos de la letra, tiempos de Whisper, palabras
   omitidas interpoladas; rechazo si coincide < 50%. La etapa `segment` la usa cuando
   hay letra. Canciones de prueba: 99% y 98% de coincidencia.
-- [ ] **US-2.5 F0 de referencia.** `PitchExtractor` → CREPE, curva por línea con máscara
-  de voicing. Incluye la **capa B anti-alucinaciones**: descartar palabras transcriptas
-  en tramos donde CREPE no detecta voz.
-- [ ] **US-2.6 Orquestación Celery.** Chain `separate → transcribe → segment → extract_f0 →
-  persist`, con estados, manejo de errores y liberación de memoria.
+- [x] **US-2.5 F0 de referencia.** `PitchExtractor` → torchcrepe (`full`, viterbi) en un
+  runner propio en subproceso; artefacto `work/pitch.json` (curva global MIDI +
+  confianza). **Capa B anti-alucinaciones**: descarta rachas de ≥ 3 palabras
+  transcriptas sin voz (las palabras sueltas sin voz son normales en rap). CLI
+  `run-stage pitch` con resumen por verso. ~12 s por canción, ~2.8 GB de VRAM.
+- [ ] **US-2.6 Orquestación Celery.** Chain `separate → transcribe → pitch → segment →
+  persist` (el pitch va antes del armado de líneas para que use la transcripción ya
+  filtrada), con estados, manejo de errores y liberación de memoria. `persist` arma el
+  `SongAnalysisData` (líneas + curva + `PipelineInfo`) y lo guarda en `song_analyses`.
 
 ## E3 — API de catálogo
 

@@ -5,7 +5,12 @@ from pathlib import Path
 import pytest
 
 from app.ml import audio
-from app.ml.audio import InvalidAudioError, probe_duration_ms, transcode_to_mp3
+from app.ml.audio import (
+    InvalidAudioError,
+    probe_duration_ms,
+    transcode_to_mp3,
+    transcode_to_wav,
+)
 from app.ml.tools import ToolError
 
 
@@ -89,3 +94,15 @@ async def test_transcode_propagates_failures(fake_tool: FakeRunTool) -> None:
 
     with pytest.raises(ToolError):
         await transcode_to_mp3(Path("in.flac"), Path("out.mp3"))
+
+
+async def test_transcode_to_wav_builds_mono_pcm_command(fake_tool: FakeRunTool) -> None:
+    await transcode_to_wav(Path("vocals.flac"), Path("vocals.wav"), sample_rate=16_000)
+
+    command = fake_tool.commands[0]
+    assert command[0] == "ffmpeg"
+    assert command[command.index("-i") + 1] == "vocals.flac"
+    assert command[command.index("-ac") + 1] == "1"
+    assert command[command.index("-ar") + 1] == "16000"
+    assert command[command.index("-c:a") + 1] == "pcm_s16le"
+    assert command[-1] == "vocals.wav"

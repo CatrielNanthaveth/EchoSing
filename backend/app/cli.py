@@ -6,6 +6,7 @@ Usage (from ``backend/``)::
     uv run python -m app.cli set-lyrics <song_id> lyrics.txt
     uv run python -m app.cli run-stage separate <song_id> [--separator roformer]
     uv run python -m app.cli run-stage transcribe <song_id>
+    uv run python -m app.cli run-stage pitch <song_id>
     uv run python -m app.cli run-stage segment <song_id>
 
 ``run-stage`` runs a single ingestion stage synchronously, without Celery. It is
@@ -27,6 +28,7 @@ from pydantic import BaseModel
 from app.core.config import Settings, get_settings
 from app.db.session import create_engine, create_session_factory
 from app.domain.enums import SeparationPreset
+from app.services.pipeline.pitch import PitchResult, build_pitch_stage
 from app.services.pipeline.segmentation import SegmentationResult, SegmentationStage
 from app.services.pipeline.separation import build_separation_stage
 from app.services.pipeline.transcription import (
@@ -44,7 +46,7 @@ from app.storage.local import LocalStorage
 from app.workers.celery_app import celery_app
 from app.workers.queue import CeleryJobQueue
 
-STAGES = ("separate", "transcribe", "segment")
+STAGES = ("separate", "transcribe", "pitch", "segment")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -167,6 +169,9 @@ async def _run_stage(args: argparse.Namespace, settings: Settings) -> BaseModel:
             storage = LocalStorage(settings.storage_root)
             if args.stage == "segment":
                 return await SegmentationStage(session, storage).run(args.song_id)
+            if args.stage == "pitch":
+                pitch = build_pitch_stage(session, storage, settings)
+                return await pitch.run(args.song_id)
             if args.stage == "transcribe":
                 transcription = build_transcription_stage(session, storage, settings)
                 return await transcription.run(args.song_id)
@@ -193,6 +198,24 @@ def summarize(result: BaseModel) -> str:
     Returns:
         Text to print.
     """
+    if isinstance(result, PitchResult):
+        unvoiced = " ".join(
+            f"{w.text}@{w.start_ms / 1000:.2f}s" for w in result.unvoiced_words
+        )
+        action = "discarded" if result.unvoiced_words_discarded else "report only"
+        return "\n".join(
+            [
+                f"extractor: {result.extractor} | frames: {result.frame_count} "
+                f"| sung: {result.voiced_ratio:.0%} | saved to: {result.artifact_key}",
+                f"words sung over no voice ({action}): {unvoiced or '(none)'}",
+            ]
+            + [
+                f"{s.index:>3} sung {s.voiced_ratio:>4.0%} "
+                f"{(s.median_note or '-'):>4} "
+                f"[{s.low_note or '-'}..{s.high_note or '-'}]  {s.text}"
+                for s in result.line_stats
+            ]
+        )
     if isinstance(result, SegmentationResult):
         lines = result.lyrics.lines
         header = [

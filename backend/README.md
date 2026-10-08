@@ -116,13 +116,18 @@ or to re-process a song; needs the `ml` group):
 uv run python -m app.cli run-stage separate <song_id>
 uv run python -m app.cli run-stage separate <song_id> --separator roformer  # switch preset
 uv run python -m app.cli run-stage transcribe <song_id>
+uv run python -m app.cli run-stage pitch <song_id>
 uv run python -m app.cli run-stage segment <song_id>      # no GPU, ~0.3 s
 ```
+
+Pipeline order: `separate -> transcribe -> pitch -> segment` (pitch runs before
+segment so that lines are built from the hallucination-filtered transcription).
 
 | Stage | Tool | Produces |
 |---|---|---|
 | `separate` | Separation preset (subprocess) + FFmpeg | `vocals.flac` (input for transcription and pitch), `instrumental.mp3` 192 kbps (streamed to clients), `songs.duration_ms` |
 | `transcribe` | Whisper `large-v3-turbo` CLI (subprocess) on `vocals.flac` | `work/transcription.json` (timed words; intermediate artifact, not an asset), `songs.language` if it was unknown |
+| `pitch` | torchcrepe `full` + viterbi (subprocess runner) on `vocals.flac` | `work/pitch.json` (reference pitch curve: MIDI + confidence every 10 ms); removes hallucinated phrases from the transcription |
 | `segment` | `app/services/lyrics.py` (pure Python) | `work/lines.json` (lyric lines with timed words; from the official lyrics when the song has them) |
 
 ### Transcription
@@ -141,6 +146,23 @@ slower and at the edge of 8 GB of VRAM. The output is then cleaned up:
 
 Reference on an RTX 5060: ~20–25 s per song with cached weights, ~5.2 GB of VRAM.
 The first run downloads the turbo weights (~1.5 GB).
+
+### Reference pitch
+
+`app/ml/runners/crepe_runner.py` runs torchcrepe in a subprocess (PyTorch never
+loads in the worker) on the vocals decoded to 16 kHz mono WAV: `full` model, viterbi
+decoder (fewer octave jumps), 65–1100 Hz, 10 ms hop. Confidence is median-filtered and
+zeroed below -60 dB, so faint instrument bleed in the separated vocals is not
+counted as singing. Stored as described in [analysis-format.md](../docs/analysis-format.md).
+
+Hallucination filter, layer B: phrases of **3 or more consecutive words** transcribed
+over frames with no voice (< 5% of frames at confidence >= 50) are moved to the
+transcription's `discarded`. Single unvoiced words are kept on purpose: in rap,
+short words and small timing offsets often land on unvoiced frames (per-word
+filtering flagged 23 real words on a test rap song; per-run filtering flags none,
+while a real hallucination like "Gracias por ver el video" is a 5-word run).
+
+Reference on an RTX 5060: ~12 s per song, ~2.8 GB of VRAM.
 
 ### Official lyrics
 
