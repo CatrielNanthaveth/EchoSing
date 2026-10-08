@@ -2,16 +2,26 @@
 
 import sys
 from pathlib import Path
-from typing import Any, Protocol, Self
+from typing import Protocol, Self
 
 import anyio
 import numpy as np
-from numpy.typing import NDArray
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from app.ml.audio import transcode_to_wav
 from app.ml.tools import ToolError, run_tool
 from app.schemas.analysis import PitchCurve
+from app.scoring.pitch import hz_to_midi
+
+__all__ = [
+    "PITCH_HOP_MS",
+    "PITCH_SAMPLE_RATE",
+    "CrepeExtractor",
+    "PitchExtractionError",
+    "PitchExtractor",
+    "RawPitch",
+    "hz_to_midi",
+]
 
 PITCH_SAMPLE_RATE = 16_000
 PITCH_HOP_MS = 10
@@ -19,25 +29,6 @@ PITCH_HOP_MS = 10
 
 class PitchExtractionError(Exception):
     """The pitch extractor failed or produced unreadable output."""
-
-
-def hz_to_midi(frequency_hz: NDArray[np.floating[Any]]) -> NDArray[np.float64]:
-    """Convert frequencies to fractional MIDI note numbers.
-
-    ``midi = 69 + 12 * log2(f / 440)``: 440 Hz -> 69.0 (A4). Non-positive and
-    NaN frequencies become NaN (no pitch estimate).
-
-    Args:
-        frequency_hz: Frequencies in Hz.
-
-    Returns:
-        MIDI note numbers, same shape as the input.
-    """
-    frequency = np.asarray(frequency_hz, dtype=np.float64)
-    valid = np.isfinite(frequency) & (frequency > 0)
-    midi = np.full(frequency.shape, np.nan)
-    midi[valid] = 69.0 + 12.0 * np.log2(frequency[valid] / 440.0)
-    return midi
 
 
 class RawPitch(BaseModel):
