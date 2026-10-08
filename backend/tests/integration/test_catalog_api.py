@@ -280,3 +280,122 @@ async def test_cors_rejects_other_origins(client: AsyncClient) -> None:
     response = await client.get("/songs", headers={"Origin": "http://evil.example"})
 
     assert "access-control-allow-origin" not in response.headers
+
+
+# --- US-3.3: instrumental streaming --------------------------------------------
+
+
+async def test_instrumental_without_range_is_served_whole(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    storage: LocalStorage,
+    analysis_json: dict[str, Any],
+) -> None:
+    song_id = await add_song(db_session, storage, analysis_json, "Song")
+
+    response = await client.get(
+        f"/songs/{song_id}/instrumental", headers={"Accept-Encoding": "gzip"}
+    )
+
+    assert response.status_code == 200
+    assert response.content == INSTRUMENTAL
+    assert response.headers["content-type"] == "audio/mpeg"
+    assert response.headers["accept-ranges"] == "bytes"
+    assert response.headers["content-length"] == str(len(INSTRUMENTAL))
+    assert "content-encoding" not in response.headers  # audio is never gzipped
+
+
+@pytest.mark.parametrize(
+    ("range_header", "start", "stop"),
+    [
+        ("bytes=0-99", 0, 100),
+        ("bytes=5000-", 5000, len(INSTRUMENTAL)),
+        ("bytes=-256", len(INSTRUMENTAL) - 256, len(INSTRUMENTAL)),
+        ("bytes=10000-99999", 10000, len(INSTRUMENTAL)),
+    ],
+)
+async def test_instrumental_range_requests(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    storage: LocalStorage,
+    analysis_json: dict[str, Any],
+    range_header: str,
+    start: int,
+    stop: int,
+) -> None:
+    song_id = await add_song(db_session, storage, analysis_json, "Song")
+
+    response = await client.get(
+        f"/songs/{song_id}/instrumental", headers={"Range": range_header}
+    )
+
+    assert response.status_code == 206
+    assert response.content == INSTRUMENTAL[start:stop]
+    assert response.headers["content-range"] == (
+        f"bytes {start}-{stop - 1}/{len(INSTRUMENTAL)}"
+    )
+    assert response.headers["content-length"] == str(stop - start)
+
+
+async def test_unsatisfiable_range_is_416(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    storage: LocalStorage,
+    analysis_json: dict[str, Any],
+) -> None:
+    song_id = await add_song(db_session, storage, analysis_json, "Song")
+
+    response = await client.get(
+        f"/songs/{song_id}/instrumental", headers={"Range": "bytes=999999-"}
+    )
+
+    assert response.status_code == 416
+    assert response.headers["content-range"] == f"bytes */{len(INSTRUMENTAL)}"
+
+
+async def test_malformed_range_serves_the_whole_file(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    storage: LocalStorage,
+    analysis_json: dict[str, Any],
+) -> None:
+    song_id = await add_song(db_session, storage, analysis_json, "Song")
+
+    response = await client.get(
+        f"/songs/{song_id}/instrumental", headers={"Range": "bytes=0-10,20-30"}
+    )
+
+    assert response.status_code == 200
+    assert response.content == INSTRUMENTAL
+
+
+async def test_instrumental_of_unavailable_song_is_404(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    storage: LocalStorage,
+    analysis_json: dict[str, Any],
+) -> None:
+    pending = await add_song(
+        db_session, storage, analysis_json, "Pending", analysis=False
+    )
+
+    assert (await client.get(f"/songs/{pending}/instrumental")).status_code == 404
+    assert (await client.get(f"/songs/{uuid.uuid4()}/instrumental")).status_code == 404
+
+
+async def test_cors_exposes_range_headers(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    storage: LocalStorage,
+    analysis_json: dict[str, Any],
+) -> None:
+    song_id = await add_song(db_session, storage, analysis_json, "Song")
+
+    response = await client.get(
+        f"/songs/{song_id}/instrumental",
+        headers={"Origin": "http://localhost:5173", "Range": "bytes=0-9"},
+    )
+
+    exposed = response.headers["access-control-expose-headers"].lower()
+    assert "content-range" in exposed
+    assert "accept-ranges" in exposed

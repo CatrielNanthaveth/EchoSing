@@ -3,11 +3,15 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
+from fastapi.responses import StreamingResponse
 
+from app.api.http_range import RangeNotSatisfiableError, parse_range
 from app.schemas.catalog import SongDetail, SongPage
 from app.services.catalog import CatalogService, get_catalog_service
 from app.services.errors import SongNotFoundError
+from app.storage.base import StorageBackend
+from app.storage.dependencies import get_storage
 
 router = APIRouter(prefix="/songs", tags=["catalog"])
 
@@ -36,3 +40,52 @@ async def get_song(
         return await service.get_song(song_id)
     except SongNotFoundError as error:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+
+
+@router.get(
+    "/{song_id}/instrumental",
+    response_class=StreamingResponse,
+    responses={
+        status.HTTP_206_PARTIAL_CONTENT: {"description": "Requested byte range"},
+        status.HTTP_404_NOT_FOUND: {"description": "Song not available"},
+        status.HTTP_416_RANGE_NOT_SATISFIABLE: {"description": "Range out of file"},
+    },
+)
+async def stream_instrumental(
+    song_id: uuid.UUID,
+    service: Annotated[CatalogService, Depends(get_catalog_service)],
+    storage: Annotated[StorageBackend, Depends(get_storage)],
+    range_header: Annotated[str | None, Header(alias="Range")] = None,
+) -> Response:
+    """Stream the karaoke track, supporting HTTP range requests (seeking)."""
+    try:
+        audio = await service.get_instrumental(song_id)
+    except SongNotFoundError as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+
+    size = await storage.size(audio.storage_key)
+    headers = {"Accept-Ranges": "bytes"}
+    try:
+        byte_range = parse_range(range_header, size)
+    except RangeNotSatisfiableError:
+        return Response(
+            status_code=status.HTTP_416_RANGE_NOT_SATISFIABLE,
+            headers={**headers, "Content-Range": f"bytes */{size}"},
+        )
+
+    start, stop = (
+        (0, size) if byte_range is None else (byte_range.start, byte_range.stop)
+    )
+    headers["Content-Length"] = str(stop - start)
+    if byte_range is not None:
+        headers["Content-Range"] = byte_range.content_range(size)
+    return StreamingResponse(
+        await storage.stream(audio.storage_key, start, stop),
+        status_code=(
+            status.HTTP_200_OK
+            if byte_range is None
+            else status.HTTP_206_PARTIAL_CONTENT
+        ),
+        media_type=audio.content_type,
+        headers=headers,
+    )

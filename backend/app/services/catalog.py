@@ -4,18 +4,31 @@ import uuid
 from typing import Annotated
 
 from fastapi import Depends
-from pydantic import TypeAdapter
+from pydantic import BaseModel, TypeAdapter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.repositories.catalog import CatalogRepository, PlayableSong
+from app.db.repositories.song_assets import SongAssetRepository
 from app.db.session import get_db_session
-from app.domain.enums import SongStatus
+from app.domain.enums import AssetKind, SongStatus
 from app.schemas.analysis import LyricLine
 from app.schemas.catalog import SongDetail, SongPage, SongSummary
 from app.services.errors import SongNotFoundError
 
 _LINES = TypeAdapter(list[LyricLine])
 _IN_PROGRESS = (SongStatus.PENDING, SongStatus.PROCESSING)
+
+
+class InstrumentalAudio(BaseModel):
+    """Location of a song's karaoke track.
+
+    Attributes:
+        storage_key: Storage key of the audio file.
+        content_type: Its media type.
+    """
+
+    storage_key: str
+    content_type: str
 
 
 def _summary(playable: PlayableSong) -> SongSummary:
@@ -41,6 +54,30 @@ class CatalogService:
             session: Database session.
         """
         self._catalog = CatalogRepository(session)
+        self._assets = SongAssetRepository(session)
+
+    async def get_instrumental(self, song_id: uuid.UUID) -> InstrumentalAudio:
+        """Locate the karaoke track of a playable song.
+
+        Args:
+            song_id: Id of the song.
+
+        Returns:
+            Where the instrumental is stored and its media type.
+
+        Raises:
+            SongNotFoundError: If the song does not exist or is not playable.
+        """
+        asset = (
+            await self._assets.get(song_id, AssetKind.INSTRUMENTAL)
+            if await self._catalog.get_playable(song_id)
+            else None
+        )
+        if asset is None:
+            raise SongNotFoundError(f"Song {song_id} is not available")
+        return InstrumentalAudio(
+            storage_key=asset.storage_key, content_type=asset.content_type
+        )
 
     async def list_songs(self, query: str | None, limit: int, offset: int) -> SongPage:
         """List playable songs, optionally filtered by title or artist.

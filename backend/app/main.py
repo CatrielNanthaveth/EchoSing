@@ -6,11 +6,15 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from starlette.middleware.gzip import DEFAULT_EXCLUDED_CONTENT_TYPES
 
 from app.api.routes import admin, health, songs
 from app.core.config import Settings, get_settings
 from app.core.redis import create_redis_client
 from app.db.session import create_engine, create_session_factory
+from app.services.song_ingestion import AUDIO_CONTENT_TYPES
+
+AUDIO_MEDIA_TYPES = tuple(sorted(set(AUDIO_CONTENT_TYPES.values())))
 
 
 def _build_lifespan(
@@ -58,7 +62,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     application.dependency_overrides[get_settings] = lambda: resolved
     # Lyrics and pitch curves are large, highly compressible JSON documents.
-    application.add_middleware(GZipMiddleware, minimum_size=1000)
+    # Audio is already compressed, and gzipping it would break range requests.
+    application.add_middleware(
+        GZipMiddleware,
+        minimum_size=1000,
+        exclude_content_types=(*DEFAULT_EXCLUDED_CONTENT_TYPES, *AUDIO_MEDIA_TYPES),
+    )
     application.add_middleware(
         CORSMiddleware,
         allow_origins=resolved.cors_origins,
