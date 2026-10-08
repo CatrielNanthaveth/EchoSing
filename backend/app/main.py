@@ -4,8 +4,10 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
-from app.api.routes import admin, health
+from app.api.routes import admin, health, songs
 from app.core.config import Settings, get_settings
 from app.core.redis import create_redis_client
 from app.db.session import create_engine, create_session_factory
@@ -55,7 +57,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=_build_lifespan(resolved),
     )
     application.dependency_overrides[get_settings] = lambda: resolved
+    # Lyrics and pitch curves are large, highly compressible JSON documents.
+    application.add_middleware(GZipMiddleware, minimum_size=1000)
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=resolved.cors_origins,
+        allow_methods=["GET", "POST", "PUT"],
+        allow_headers=["*"],
+        # Needed by audio players doing range requests from another origin.
+        expose_headers=["Accept-Ranges", "Content-Range", "Content-Length"],
+    )
     application.include_router(health.router)
+    application.include_router(songs.router)
     application.include_router(admin.router)
     return application
 

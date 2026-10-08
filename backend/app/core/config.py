@@ -24,6 +24,8 @@ class Settings(BaseSettings):
         admin_token: Shared secret required in ``X-Admin-Token`` by admin
             endpoints. When unset, admin endpoints are disabled.
         max_upload_bytes: Max size of an uploaded song file.
+        cors_origins: Browser origins allowed to call the API (e.g. the web
+            client's dev server).
         ml_device: Torch device for ML models (``cuda`` or ``cpu``).
         ml_models_dir: Where downloaded model weights are cached.
         default_separation_preset: Preset used when a song does not choose one.
@@ -69,6 +71,7 @@ class Settings(BaseSettings):
     storage_root: Path = Path("storage")
     admin_token: SecretStr | None = None
     max_upload_bytes: int = Field(default=50 * 1024 * 1024, gt=0)
+    cors_origins: list[str] = ["http://localhost:5173"]
     ml_device: str = "cuda"
     ml_models_dir: Path = Path.home() / ".cache" / "echosing" / "models"
     default_separation_preset: SeparationPreset = SeparationPreset.DEMUCS
