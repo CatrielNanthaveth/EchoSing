@@ -225,11 +225,15 @@ Format: UTF-8 text, one verse per line, **complete as sung** (no "chorus x2").
 Empty lines, `[Section]` labels and lines fully in parentheses (backing vocals, which
 the transcriber rarely captures) are ignored.
 
-Alignment (`align_lyrics`) compares words ignoring case, accents and punctuation:
-matched words take the transcribed timing, misheard ones share the time of what was
-heard, missed ones are interpolated between their neighbors and extra transcribed
-words are ignored. If fewer than 50% of the words match, the lyrics are rejected
-(incomplete, abbreviated or from another song). Test songs: 99% and 98% matched.
+Alignment (`align_lyrics`) compares words ignoring case, accents and punctuation, and
+pairs them in order with an optimal alignment (a weighted longest common
+subsequence), so repeated choruses are never paired with the wrong repetition.
+Matched words take the transcribed timing, including near matches one letter apart
+(elisions such as `feli'`/`feliz` or `la'o`/`lado`, one-letter mishearings);
+misheard ones share the time of what was heard, missed ones are interpolated between
+their neighbors and extra transcribed words are ignored. If fewer than 50% of the
+words match, the lyrics are rejected (incomplete, abbreviated or from another song).
+Test songs: 99%, 98% and 85% ("Rara vez", with slang and four choruses) matched.
 
 ### Line segmentation
 

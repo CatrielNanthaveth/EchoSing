@@ -10,11 +10,13 @@ Two strategies:
   length limits suited to per-line scoring.
 """
 
-import difflib
 import re
 import unicodedata
 from collections.abc import Sequence
+from typing import Literal
 
+import numpy as np
+import numpy.typing as npt
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.ml.transcription import TranscribedWord
@@ -255,6 +257,9 @@ class AlignmentReport(BaseModel):
     Attributes:
         lyric_words: Words in the official lyrics.
         matched_words: Official words found verbatim in the transcription.
+        near_matched_words: Official words heard almost the same (an elision
+            or one letter apart, e.g. "feli'" heard as "feliz"); timed like
+            verbatim matches.
         replaced_words: Official words timed from different transcribed words.
         interpolated_words: Official words the transcriber missed, timed by
             interpolation between their neighbors.
@@ -264,14 +269,16 @@ class AlignmentReport(BaseModel):
 
     lyric_words: int
     matched_words: int
+    near_matched_words: int = 0
     replaced_words: int
     interpolated_words: int
     unused_transcribed_words: int
 
     @property
     def match_ratio(self) -> float:
-        """Fraction of official words found verbatim in the transcription."""
-        return self.matched_words / self.lyric_words if self.lyric_words else 0.0
+        """Fraction of official words found, verbatim or nearly."""
+        found = self.matched_words + self.near_matched_words
+        return found / self.lyric_words if self.lyric_words else 0.0
 
 
 class AlignedLyrics(BaseModel):
@@ -365,6 +372,128 @@ def _distribute(start: int, end: int, weights: Sequence[int]) -> list[tuple[int,
     return spans
 
 
+# Alignment weights: an exact match is worth more than a near match, so the
+# alignment prefers exact pairs and uses near ones to fill the rest.
+_EXACT_WEIGHT = 4
+_NEAR_WEIGHT = 3
+
+_Tag = Literal["equal", "near", "replace", "delete", "insert"]
+_Opcode = tuple[_Tag, int, int, int, int]
+
+
+def _within_one_edit(a: str, b: str) -> bool:
+    """Whether ``a`` becomes ``b`` with at most one insertion, deletion or change."""
+    if abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) > len(b):
+        a, b = b, a
+    i = 0
+    while i < len(a) and a[i] == b[i]:
+        i += 1
+    if len(a) == len(b):
+        return a[i + 1 :] == b[i + 1 :]
+    return a[i:] == b[i + 1 :]
+
+
+def is_near_word(official: str, heard: str) -> bool:
+    """Whether two different comparison keys are probably the same sung word.
+
+    Covers elisions written in lyrics ("feli'" -> "feli" vs "feliz", "la'o" ->
+    "lao" vs "lado") and one-letter mishearings ("nera" vs "negra"). Pairs of
+    two-letter words ("de"/"te") are too ambiguous and never count.
+
+    Args:
+        official: Key of the official word (see ``normalize_word``).
+        heard: Key of the transcribed word.
+
+    Returns:
+        True if they differ, are one edit apart and are long enough.
+    """
+    return (
+        official != heard
+        and min(len(official), len(heard)) >= 2
+        and max(len(official), len(heard)) >= 3
+        and _within_one_edit(official, heard)
+    )
+
+
+def _pair_weight(official: str, heard: str) -> int:
+    if official and official == heard:
+        return _EXACT_WEIGHT
+    return _NEAR_WEIGHT if is_near_word(official, heard) else 0
+
+
+def _match_weights(
+    official: Sequence[str], heard: Sequence[str]
+) -> npt.NDArray[np.int64]:
+    """Weight of pairing each official word with each heard word (0: no match).
+
+    Words are compared once per distinct pair of keys, not once per position.
+    """
+    official_vocab, official_ids = np.unique(np.asarray(official), return_inverse=True)
+    heard_vocab, heard_ids = np.unique(np.asarray(heard), return_inverse=True)
+    vocab_weights = np.array(
+        [[_pair_weight(str(o), str(h)) for h in heard_vocab] for o in official_vocab],
+        dtype=np.int64,
+    ).reshape(len(official_vocab), len(heard_vocab))
+    return vocab_weights[np.ix_(official_ids, heard_ids)]
+
+
+def _align_sequences(official: Sequence[str], heard: Sequence[str]) -> list[_Opcode]:
+    """Optimal in-order alignment of two word sequences, as opcodes.
+
+    Maximizes the total match weight (a weighted longest common subsequence).
+    Unlike a greedy longest-block matcher, it cannot pair the first chorus of
+    the lyrics with a later chorus of the recording and lose everything in
+    between. Each row is computed with numpy: with ``c[j]`` the best score that
+    takes pair ``(i, j)`` or skips official word ``i``, the row is the running
+    maximum of ``c``.
+
+    Args:
+        official: Keys of the official words.
+        heard: Keys of the transcribed words.
+
+    Returns:
+        Opcodes in order: ``equal``/``near`` for single matched pairs and
+        ``replace``/``delete``/``insert`` for the unmatched runs between them.
+    """
+    weights = _match_weights(official, heard)
+    rows, columns = weights.shape
+    best = np.zeros((rows + 1, columns + 1), dtype=np.int64)
+    for i in range(rows):
+        take = np.where(weights[i] > 0, best[i, :-1] + weights[i], 0)
+        best[i + 1, 1:] = np.maximum.accumulate(np.maximum(best[i, 1:], take))
+
+    pairs: list[tuple[int, int]] = []
+    i, j = rows, columns
+    while i > 0 and j > 0:
+        weight = int(weights[i - 1, j - 1])
+        if weight and best[i, j] == best[i - 1, j - 1] + weight:
+            pairs.append((i - 1, j - 1))
+            i, j = i - 1, j - 1
+        elif best[i, j] == best[i - 1, j]:
+            i -= 1
+        else:
+            j -= 1
+    pairs.reverse()
+
+    opcodes: list[_Opcode] = []
+    previous_i = previous_j = 0
+    for pair_i, pair_j in [*pairs, (rows, columns)]:
+        if pair_i > previous_i and pair_j > previous_j:
+            opcodes.append(("replace", previous_i, pair_i, previous_j, pair_j))
+        elif pair_i > previous_i:
+            opcodes.append(("delete", previous_i, pair_i, previous_j, previous_j))
+        elif pair_j > previous_j:
+            opcodes.append(("insert", previous_i, previous_i, previous_j, pair_j))
+        if pair_i < rows:
+            exact = weights[pair_i, pair_j] == _EXACT_WEIGHT
+            tag: _Tag = "equal" if exact else "near"
+            opcodes.append((tag, pair_i, pair_i + 1, pair_j, pair_j + 1))
+        previous_i, previous_j = pair_i + 1, pair_j + 1
+    return opcodes
+
+
 def align_lyrics(
     lines: Sequence[str],
     transcribed: Sequence[TranscribedWord],
@@ -373,10 +502,12 @@ def align_lyrics(
 ) -> AlignedLyrics:
     """Time the words of official lyrics using a transcription.
 
-    Words are compared by ``normalize_word`` and aligned as sequences, so the
-    alignment survives missing, extra and misheard words:
+    Words are compared by ``normalize_word`` and aligned in order with an
+    optimal alignment (robust to repeated choruses), so it survives missing,
+    extra and misheard words:
 
-    - matched words take the transcribed timing;
+    - matched words, verbatim or nearly (``is_near_word``), take the
+      transcribed timing;
     - misheard words share the time span of the words heard in their place;
     - words the transcriber missed are interpolated between their neighbors
       (borrowing time from them when Whisper left no gap);
@@ -386,7 +517,7 @@ def align_lyrics(
         lines: Official lyric lines (see ``parse_lyrics_text``).
         transcribed: Transcribed words with strictly increasing times.
         min_match_ratio: Minimum fraction of official words that must be found
-            in the transcription.
+            in the transcription, verbatim or nearly.
 
     Returns:
         The official lines with timed words and a quality report.
@@ -404,16 +535,14 @@ def align_lyrics(
 
     official_keys = [normalize_word(word) for _, word in official]
     heard_keys = [normalize_word(word.text) for word in transcribed]
-    matcher = difflib.SequenceMatcher(None, official_keys, heard_keys, autojunk=False)
-
     times: list[tuple[int, int] | None] = [None] * len(official)
-    matched = replaced = unused = 0
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag == "equal":
-            for offset in range(i2 - i1):
-                heard = transcribed[j1 + offset]
-                times[i1 + offset] = (heard.start_ms, heard.end_ms)
-            matched += i2 - i1
+    matched = near = replaced = unused = 0
+    for tag, i1, i2, j1, j2 in _align_sequences(official_keys, heard_keys):
+        if tag in ("equal", "near"):
+            heard = transcribed[j1]
+            times[i1] = (heard.start_ms, heard.end_ms)
+            matched += tag == "equal"
+            near += tag == "near"
         elif tag == "replace":
             span_start, span_end = transcribed[j1].start_ms, transcribed[j2 - 1].end_ms
             weights = [max(len(key), 1) for key in official_keys[i1:i2]]
@@ -428,6 +557,7 @@ def align_lyrics(
     report = AlignmentReport(
         lyric_words=len(official),
         matched_words=matched,
+        near_matched_words=near,
         replaced_words=replaced,
         interpolated_words=sum(span is None for span in times),
         unused_transcribed_words=unused,

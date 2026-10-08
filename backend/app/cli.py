@@ -276,8 +276,9 @@ def summarize(result: BaseModel) -> str:
         report = result.lyrics.alignment
         if report is not None:
             header.append(
-                f"alignment: {report.matched_words}/{report.lyric_words} words "
-                f"matched ({report.match_ratio:.0%}), {report.replaced_words} "
+                f"alignment: {report.matched_words} exact + "
+                f"{report.near_matched_words} near of {report.lyric_words} words "
+                f"({report.match_ratio:.0%}), {report.replaced_words} "
                 f"replaced, {report.interpolated_words} interpolated, "
                 f"{report.unused_transcribed_words} transcribed words unused"
             )

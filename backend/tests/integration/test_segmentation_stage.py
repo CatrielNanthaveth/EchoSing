@@ -127,6 +127,6 @@ async def test_summary_shows_source_alignment_and_timed_lines(
     summary = summarize(result).splitlines()
 
     assert summary[0].startswith("source: official | lines: 2")
-    assert summary[1].startswith("alignment: 9/9 words matched (100%)")
+    assert summary[1].startswith("alignment: 9 exact + 0 near of 9 words (100%)")
     assert summary[2] == "  0 [0:00.00 - 0:01.60] Dame de tu vida"
     assert summary[3] == "  1 [0:01.60 - 0:03.60] Que me obligue a renacer"
