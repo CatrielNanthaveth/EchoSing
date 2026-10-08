@@ -22,7 +22,18 @@ export interface MicTestStats {
   clarityThreshold: number;
   /** Median length of the stretches with voice, in ms. */
   medianVoicedRunMs: number | null;
+  /** Median detected note (Hz). */
+  medianF0: number | null;
+  /** Frames with voice without the high-pass filter (null: no diagnostics). */
+  rawVoicedShare: number | null;
+  /** Median share of the energy below the filter cutoff, non-silent frames. */
+  lowFrequencyShare: number | null;
+  /** Frames whose unfiltered window has a click-like peak. */
+  clickShare: number | null;
 }
+
+/** Peak / RMS above this is a click (a sung vowel stays below ~4). */
+export const CLICK_CREST = 8;
 
 function median(values: readonly number[]): number | null {
   if (values.length === 0) return null;
@@ -76,6 +87,31 @@ export function micTestStats(frames: readonly VoiceFrame[]): MicTestStats {
     rejectedClarity: round(median(rejected.map((frame) => frame.clarity)), 2),
     clarityThreshold: 1 - YIN_THRESHOLD,
     medianVoicedRunMs: round(median(runs.map((length) => length * hopMs)), 0),
+    medianF0: round(median(voiced.map((frame) => frame.f0)), 0),
+    ...diagnosticStats(frames),
+  };
+}
+
+function diagnosticStats(
+  frames: readonly VoiceFrame[],
+): Pick<MicTestStats, "rawVoicedShare" | "lowFrequencyShare" | "clickShare"> {
+  const diagnosed = frames.flatMap((frame) =>
+    frame.diagnostics === undefined ? [] : [{ frame, d: frame.diagnostics }],
+  );
+  if (diagnosed.length === 0) {
+    return { rawVoicedShare: null, lowFrequencyShare: null, clickShare: null };
+  }
+  const audible = diagnosed.filter(({ frame }) => !frame.gated);
+  return {
+    rawVoicedShare: round(
+      diagnosed.filter(({ d }) => d.rawF0 > 0).length / diagnosed.length,
+      3,
+    ),
+    lowFrequencyShare: round(median(audible.map(({ d }) => d.lowFrequencyShare)), 2),
+    clickShare: round(
+      diagnosed.filter(({ d }) => d.crest > CLICK_CREST).length / diagnosed.length,
+      3,
+    ),
   };
 }
 
@@ -93,6 +129,19 @@ export function micTestAdvice(stats: MicTestStats): string[] {
   if (stats.gatedShare >= 0.15) {
     advice.push(
       "El micrófono te capta bajo: acercate, subí la ganancia del micrófono en el sistema o cantá más fuerte.",
+    );
+  }
+  if (stats.clickShare !== null && stats.clickShare >= 0.05) {
+    advice.push(
+      "Hay clics en el audio del micrófono: probá otro puerto USB o desactivá las mejoras de audio de Windows para este micrófono.",
+    );
+  }
+  if (
+    stats.rawVoicedShare !== null &&
+    stats.voicedShare - stats.rawVoicedShare >= 0.05
+  ) {
+    advice.push(
+      `El filtro de graves recupera el ${String(Math.round((stats.voicedShare - stats.rawVoicedShare) * 100))}% de tu voz (el micrófono capta mucho grave de cerca).`,
     );
   }
   if (stats.rejectedShare >= 0.15) {

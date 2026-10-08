@@ -5,6 +5,7 @@ import type { FrameListener, Microphone } from "../audio/microphone";
 import { MicTest } from "./MicTest";
 
 let listeners: Set<FrameListener>;
+const setDiagnostics = vi.fn();
 
 function fakeMicrophone(): Microphone {
   return {
@@ -12,6 +13,7 @@ function fakeMicrophone(): Microphone {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
+    setDiagnostics,
   } as unknown as Microphone;
 }
 
@@ -51,11 +53,15 @@ describe("MicTest", () => {
     act(() => {
       screen.getByRole("button", { name: "Probar micrófono" }).click();
     });
-    expect(await screen.findByText(/Sostené una nota/)).toBeVisible();
+    expect(await screen.findByText(/Sostené una nota.* en 3…/)).toBeVisible();
+    emit(100); // ignored: nothing is recorded during the countdown
+    await act(() => vi.advanceTimersByTimeAsync(3000));
+    expect(screen.getByText(/¡Ahora! Sostené una nota/)).toBeVisible();
     emit(90);
     await act(() => vi.advanceTimersByTimeAsync(4000));
 
-    expect(screen.getByText(/Ahora cantá una frase/)).toBeVisible();
+    await act(() => vi.advanceTimersByTimeAsync(3000));
+    expect(screen.getByText(/¡Ahora! Cantá una frase/)).toBeVisible();
     emit(50);
     await act(() => vi.advanceTimersByTimeAsync(6000));
 
@@ -63,13 +69,17 @@ describe("MicTest", () => {
       await screen.findByText("Solo se detectó tu voz en el 50% del tiempo."),
     ).toBeVisible();
     expect(screen.getByText(/te capta bajo/)).toBeVisible();
-    const detected = screen.getByRole("row", { name: /Voz detectada/ });
+    const detected = screen.getByRole("row", { name: /^Voz detectada \d/ });
     expect(
       within(detected)
         .getAllByRole("cell")
         .map((cell) => cell.textContent),
     ).toEqual(["90%", "50%"]);
     expect(listeners.size).toBe(0);
+    expect(setDiagnostics.mock.calls).toEqual([[true], [false]]);
+    expect(screen.getByRole("row", { name: /Nota media/ })).toHaveTextContent(
+      "A3 (220 Hz)",
+    );
     expect(screen.getByRole("button", { name: "Repetir prueba" })).toBeVisible();
   });
 
@@ -85,8 +95,9 @@ describe("MicTest", () => {
       screen.getByRole("button", { name: "Probar micrófono" }).click();
     });
     await screen.findByText(/Sostené una nota/);
+    await act(() => vi.advanceTimersByTimeAsync(3000));
     emit(100);
-    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    await act(() => vi.advanceTimersByTimeAsync(13_000));
     act(() => {
       screen.getByRole("button", { name: "Copiar resultados" }).click();
     });

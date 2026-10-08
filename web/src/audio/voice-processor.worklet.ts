@@ -12,10 +12,23 @@ declare function registerProcessor(
   processor: new () => AudioWorkletProcessor,
 ): void;
 
+/** Messages from the main thread. */
+export interface VoiceProcessorCommand {
+  type: "diagnostics";
+  enabled: boolean;
+}
+
 class VoiceProcessor extends AudioWorkletProcessor {
   readonly #analyzer = new FrameAnalyzer(sampleRate, (frame) => {
     this.port.postMessage(frame);
   });
+
+  constructor() {
+    super();
+    this.port.onmessage = (event: MessageEvent<VoiceProcessorCommand>) => {
+      this.#analyzer.setDiagnostics(event.data.enabled);
+    };
+  }
 
   process(inputs: Float32Array[][]): boolean {
     const channel = inputs[0]?.[0];

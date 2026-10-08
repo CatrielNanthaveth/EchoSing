@@ -40,7 +40,37 @@ describe("micTestStats", () => {
       rejectedClarity: 0.7,
       clarityThreshold: 0.85,
       medianVoicedRunMs: 200,
+      medianF0: 220,
+      rawVoicedShare: null,
+      lowFrequencyShare: null,
+      clickShare: null,
     });
+  });
+
+  it("compares with the unfiltered signal when diagnosing", () => {
+    const diagnosed = FRAMES.map((f, i) => ({
+      ...f,
+      diagnostics: {
+        rawF0: i < 30 ? 220 : 0,
+        rawClarity: 0.5,
+        lowFrequencyShare: f.gated ? 0 : 0.8,
+        crest: i % 10 === 0 ? 20 : 3,
+      },
+    }));
+
+    const stats = micTestStats(diagnosed);
+
+    expect(stats).toMatchObject({
+      rawVoicedShare: 0.3,
+      lowFrequencyShare: 0.8,
+      clickShare: 0.1,
+    });
+    expect(micTestAdvice(stats)).toEqual([
+      "Solo se detectó tu voz en el 70% del tiempo.",
+      expect.stringContaining("clics"),
+      "El filtro de graves recupera el 40% de tu voz (el micrófono capta mucho grave de cerca).",
+      expect.stringContaining("Hay volumen pero"),
+    ]);
   });
 
   it("handles no audio", () => {

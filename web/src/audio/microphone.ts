@@ -1,4 +1,5 @@
 import { VOICE_PROCESSOR, type VoiceFrame } from "./frameAnalyzer";
+import type { VoiceProcessorCommand } from "./voice-processor.worklet";
 import processorUrl from "./voice-processor.worklet.ts?worker&url";
 
 const loadedContexts = new WeakSet<BaseAudioContext>();
@@ -13,10 +14,12 @@ export class Microphone {
   readonly #stream: MediaStream;
   readonly #nodes: AudioNode[];
   readonly #listeners = new Set<FrameListener>();
+  readonly #port: MessagePort;
 
   private constructor(stream: MediaStream, nodes: AudioNode[], port: MessagePort) {
     this.#stream = stream;
     this.#nodes = nodes;
+    this.#port = port;
     port.onmessage = (event: MessageEvent<VoiceFrame>) => {
       for (const listener of this.#listeners) listener(event.data);
     };
@@ -66,6 +69,12 @@ export class Microphone {
     return () => {
       this.#listeners.delete(listener);
     };
+  }
+
+  /** Measure the unfiltered signal too (microphone test); costs CPU. */
+  setDiagnostics(enabled: boolean): void {
+    const command: VoiceProcessorCommand = { type: "diagnostics", enabled };
+    this.#port.postMessage(command);
   }
 
   close(): void {
