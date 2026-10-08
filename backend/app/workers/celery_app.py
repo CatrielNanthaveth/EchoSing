@@ -36,6 +36,8 @@ def create_celery_app(broker_url: str) -> Celery:
         # worker does not lose the job, and fetch one job at a time.
         task_acks_late=True,
         worker_prefetch_multiplier=1,
+        # Safety net: a whole song takes a few minutes on a GPU.
+        task_time_limit=3600,
         broker_connection_retry_on_startup=True,
     )
     return app

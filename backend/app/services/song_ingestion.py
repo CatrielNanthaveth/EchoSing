@@ -16,6 +16,7 @@ from app.db.repositories.song_assets import SongAssetRepository
 from app.db.repositories.songs import SongRepository
 from app.db.session import get_db_session
 from app.domain.enums import AssetKind, IngestionStage, SeparationPreset, SongStatus
+from app.services.errors import SongNotFoundError
 from app.services.lyrics import MAX_LYRICS_CHARS
 from app.storage.base import StorageBackend
 from app.storage.dependencies import get_storage
@@ -139,7 +140,37 @@ class SongIngestionService:
             )
 
         record, job = await self._persist(song, extension, content_type, content)
+        return await self._enqueue(record, job)
 
+    async def requeue(self, song_id: uuid.UUID) -> SongRegistration:
+        """Queue a song for processing again with a new job.
+
+        Used after changing its separation preset or lyrics, or to recover a
+        failed song. The song leaves the ``ready`` status while it is processed;
+        its current analysis is kept and only replaced (as a new version) when
+        the new run succeeds.
+
+        Args:
+            song_id: Id of the song.
+
+        Returns:
+            Ids and initial states of the song and its new job.
+
+        Raises:
+            SongNotFoundError: If the song does not exist.
+            QueueUnavailableError: If the job could not be queued; the song and
+                job are then persisted as ``failed``.
+        """
+        record = await self._songs.get(song_id)
+        if record is None:
+            raise SongNotFoundError(f"Song {song_id} does not exist")
+        await self._songs.set_status(song_id, SongStatus.PENDING)
+        job = await self._jobs.add(song_id)
+        await self._session.commit()
+        return await self._enqueue(record, job)
+
+    async def _enqueue(self, record: Song, job: IngestionJob) -> SongRegistration:
+        """Queue a committed job and record its task id."""
         try:
             task_id = await self._queue.enqueue_ingestion(job.id)
         except QueueUnavailableError as error:

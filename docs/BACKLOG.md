@@ -125,10 +125,14 @@ EchoSing/
   confianza). **Capa B anti-alucinaciones**: descarta rachas de ≥ 3 palabras
   transcriptas sin voz (las palabras sueltas sin voz son normales en rap). CLI
   `run-stage pitch` con resumen por verso. ~12 s por canción, ~2.8 GB de VRAM.
-- [ ] **US-2.6 Orquestación Celery.** Chain `separate → transcribe → pitch → segment →
-  persist` (el pitch va antes del armado de líneas para que use la transcripción ya
-  filtrada), con estados, manejo de errores y liberación de memoria. `persist` arma el
-  `SongAnalysisData` (líneas + curva + `PipelineInfo`) y lo guarda en `song_analyses`.
+- [x] **US-2.6 Orquestación Celery.** `IngestionPipeline`: `separate → transcribe → pitch
+  → segment → persist`, con estado del job por etapa, falla registrada con etapa y
+  error, jobs terminados que no se repiten y jobs interrumpidos que se rehacen. `persist`
+  arma y valida el `SongAnalysisData` (líneas + curva + `PipelineInfo` desde
+  `work/manifest.json`) y lo publica como nueva versión actual; la canción queda
+  `ready`. Tarea Celery real (límite 1 h); CLI `requeue`, `run-pipeline` y
+  `run-stage persist`. End-to-end: ~95 s (demucs) y ~220 s (roformer) por canción.
+  *Pendiente para E3:* durante un reproceso la canción deja de estar `ready`.
 
 ## E3 — API de catálogo
 

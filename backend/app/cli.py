@@ -4,6 +4,8 @@ Usage (from ``backend/``)::
 
     uv run python -m app.cli add-song song.mp3 --title "Title" --artist "Artist"
     uv run python -m app.cli set-lyrics <song_id> lyrics.txt
+    uv run python -m app.cli requeue <song_id>           # process again (worker)
+    uv run python -m app.cli run-pipeline <song_id>      # process now, no Celery
     uv run python -m app.cli run-stage separate <song_id> [--separator roformer]
     uv run python -m app.cli run-stage transcribe <song_id>
     uv run python -m app.cli run-stage pitch <song_id>
@@ -26,9 +28,13 @@ import anyio
 from pydantic import BaseModel
 
 from app.core.config import Settings, get_settings
+from app.db.repositories.ingestion_jobs import IngestionJobRepository
+from app.db.repositories.songs import SongRepository
 from app.db.session import create_engine, create_session_factory
 from app.domain.enums import SeparationPreset
+from app.services.pipeline.persist import PersistStage
 from app.services.pipeline.pitch import PitchResult, build_pitch_stage
+from app.services.pipeline.runner import run_job
 from app.services.pipeline.segmentation import SegmentationResult, SegmentationStage
 from app.services.pipeline.separation import build_separation_stage
 from app.services.pipeline.transcription import (
@@ -46,7 +52,7 @@ from app.storage.local import LocalStorage
 from app.workers.celery_app import celery_app
 from app.workers.queue import CeleryJobQueue
 
-STAGES = ("separate", "transcribe", "pitch", "segment")
+STAGES = ("separate", "transcribe", "pitch", "segment", "persist")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -78,6 +84,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     set_lyrics.add_argument("song_id", type=uuid.UUID)
     set_lyrics.add_argument("path", type=Path, help="Lyrics file (UTF-8)")
+
+    run_pipeline = commands.add_parser(
+        "run-pipeline",
+        help="Run the whole ingestion pipeline for a song now, without Celery",
+    )
+    run_pipeline.add_argument("song_id", type=uuid.UUID)
+
+    requeue = commands.add_parser(
+        "requeue", help="Queue a song for processing again (Celery worker)"
+    )
+    requeue.add_argument("song_id", type=uuid.UUID)
 
     run_stage = commands.add_parser(
         "run-stage", help="Run one ingestion stage for a song, without Celery"
@@ -121,6 +138,38 @@ async def register_file(
         The registration result.
     """
     return await service.register_song(song, path.name, read_file_chunks(path))
+
+
+async def _run_pipeline(args: argparse.Namespace, settings: Settings) -> BaseModel:
+    """Create a job for the song and run the whole pipeline synchronously."""
+    engine = create_engine(settings.database_url)
+    try:
+        async with create_session_factory(engine)() as session:
+            if await SongRepository(session).get(args.song_id) is None:
+                raise SystemExit(f"Song {args.song_id} does not exist")
+            job = await IngestionJobRepository(session).add(args.song_id)
+            await session.commit()
+            job_id = job.id
+    finally:
+        await engine.dispose()
+    return await run_job(job_id, settings)
+
+
+async def _requeue(args: argparse.Namespace, settings: Settings) -> BaseModel:
+    """Queue the song again through Celery."""
+    engine = create_engine(settings.database_url)
+    try:
+        async with create_session_factory(engine)() as session:
+            service = SongIngestionService(
+                session,
+                LocalStorage(settings.storage_root),
+                CeleryJobQueue(celery_app),
+                settings.max_upload_bytes,
+                settings.default_separation_preset,
+            )
+            return await service.requeue(args.song_id)
+    finally:
+        await engine.dispose()
 
 
 async def _set_lyrics(
@@ -167,6 +216,8 @@ async def _run_stage(args: argparse.Namespace, settings: Settings) -> BaseModel:
     try:
         async with create_session_factory(engine)() as session:
             storage = LocalStorage(settings.storage_root)
+            if args.stage == "persist":
+                return await PersistStage(session, storage).run(args.song_id)
             if args.stage == "segment":
                 return await SegmentationStage(session, storage).run(args.song_id)
             if args.stage == "pitch":
@@ -285,6 +336,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             lyrics = lyrics_path.read_text("utf-8") if lyrics_path else None
             result = asyncio.run(_add_song(args, settings, lyrics))
+    elif args.command == "requeue":
+        result = asyncio.run(_requeue(args, settings))
+    elif args.command == "run-pipeline":
+        started = time.perf_counter()
+        result = asyncio.run(_run_pipeline(args, settings))
+        print(f"Pipeline took {time.perf_counter() - started:.1f}s")
     else:
         started = time.perf_counter()
         result = asyncio.run(_run_stage(args, settings))

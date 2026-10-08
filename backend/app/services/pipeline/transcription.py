@@ -13,6 +13,7 @@ from app.db.repositories.songs import SongRepository
 from app.domain.enums import AssetKind
 from app.ml.transcription import Transcriber, Transcription, WhisperTranscriber
 from app.services.pipeline.errors import StageError
+from app.services.pipeline.manifest import update_manifest
 from app.storage.base import StorageBackend
 from app.storage.keys import work_key
 
@@ -112,6 +113,7 @@ class TranscriptionStage:
         await self._storage.save(
             key, transcription.model_dump_json(indent=2).encode(), "application/json"
         )
+        await update_manifest(self._storage, song_id, transcriber=transcription.model)
 
         if known_language is None and transcription.language:
             try:

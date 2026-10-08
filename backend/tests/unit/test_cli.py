@@ -155,3 +155,12 @@ def test_missing_lyrics_file_fails_without_touching_services(
 
     assert main(argv) == 1
     assert "File not found" in capsys.readouterr().err
+
+
+def test_pipeline_commands_are_parsed() -> None:
+    parser = build_parser()
+    song_id = "0e0b2cdf-45cb-48b0-8b06-e558286f0c18"
+
+    assert parser.parse_args(["run-pipeline", song_id]).song_id == uuid.UUID(song_id)
+    assert parser.parse_args(["requeue", song_id]).command == "requeue"
+    assert parser.parse_args(["run-stage", "persist", song_id]).stage == "persist"

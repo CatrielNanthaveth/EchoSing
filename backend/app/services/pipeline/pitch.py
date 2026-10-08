@@ -21,6 +21,7 @@ from app.ml.pitch import CrepeExtractor, PitchExtractor
 from app.ml.transcription import TranscribedWord
 from app.schemas.analysis import PitchCurve
 from app.services.pipeline.errors import StageError
+from app.services.pipeline.manifest import update_manifest
 from app.services.pipeline.segmentation import load_lines
 from app.services.pipeline.transcription import (
     TRANSCRIPTION_ARTIFACT,
@@ -142,6 +143,9 @@ class PitchStage:
         key = work_key(song_id, PITCH_ARTIFACT)
         await self._storage.save(
             key, curve.model_dump_json().encode(), "application/json"
+        )
+        await update_manifest(
+            self._storage, song_id, pitch_extractor=self._extractor.name
         )
 
         unvoiced = await self._check_transcription(song_id, curve)

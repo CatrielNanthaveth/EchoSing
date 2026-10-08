@@ -6,6 +6,10 @@ from unittest.mock import ANY, create_autospec
 import pytest
 from celery import Celery
 
+from app.core.config import Settings
+from app.domain.enums import IngestionStage
+from app.services.pipeline.runner import PipelineOutcome
+from app.workers import tasks
 from app.workers.celery_app import INGESTION_TASK, celery_app, create_celery_app
 from app.workers.queue import CeleryJobQueue, QueueUnavailableError
 from app.workers.tasks import run_ingestion
@@ -24,11 +28,45 @@ def test_celery_app_is_configured_for_long_gpu_jobs() -> None:
     assert app.conf.task_ignore_result is True
 
 
-def test_placeholder_task_logs_the_job(caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level(logging.INFO, logger="app.workers.tasks"):
-        run_ingestion("job-123")
+def test_celery_app_has_a_time_limit() -> None:
+    assert create_celery_app("redis://example:6379/0").conf.task_time_limit == 3600
 
-    assert "job-123" in caplog.text
+
+@pytest.mark.parametrize(
+    ("outcome_fields", "level", "text"),
+    [
+        ({"stage": IngestionStage.DONE}, logging.INFO, "done"),
+        (
+            {"stage": IngestionStage.FAILED, "error": "transcribing: boom"},
+            logging.ERROR,
+            "failed: transcribing: boom",
+        ),
+        ({"stage": IngestionStage.DONE, "skipped": True}, logging.INFO, "skipped"),
+    ],
+)
+def test_task_runs_the_job_and_logs_its_outcome(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    outcome_fields: dict[str, object],
+    level: int,
+    text: str,
+) -> None:
+    job_id = uuid.uuid4()
+    received: list[uuid.UUID] = []
+
+    async def fake_run_job(job: uuid.UUID, settings: Settings) -> PipelineOutcome:
+        received.append(job)
+        return PipelineOutcome.model_validate(
+            {"job_id": job, "song_id": uuid.uuid4(), **outcome_fields}
+        )
+
+    monkeypatch.setattr(tasks, "run_job", fake_run_job)
+
+    with caplog.at_level(logging.INFO, logger="app.workers.tasks"):
+        run_ingestion(str(job_id))
+
+    assert received == [job_id]
+    assert any(r.levelno == level and text in r.getMessage() for r in caplog.records)
 
 
 async def test_celery_queue_publishes_ingestion_task() -> None:

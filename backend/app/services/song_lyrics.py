@@ -9,11 +9,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.repositories.songs import SongRepository
 from app.db.session import get_db_session
+from app.services.errors import SongNotFoundError
 from app.services.lyrics import MAX_LYRICS_CHARS, parse_lyrics_text
 
-
-class SongNotFoundError(Exception):
-    """The requested song does not exist."""
+__all__ = [
+    "EmptyLyricsError",
+    "LyricsSummary",
+    "LyricsUpdate",
+    "SongLyricsService",
+    "SongNotFoundError",
+    "get_song_lyrics_service",
+]
 
 
 class EmptyLyricsError(ValueError):

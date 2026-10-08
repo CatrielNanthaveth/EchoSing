@@ -107,6 +107,25 @@ Accepted formats: mp3, m4a, wav, flac, ogg, up to `ECHOSING_MAX_UPLOAD_BYTES`
 limit is checked, so in production a reverse proxy (e.g. nginx
 `client_max_body_size`) must also cap the request size.
 
+## Ingestion pipeline
+
+A Celery worker runs every queued job through
+`separate -> transcribe -> pitch -> segment -> persist`. The job stage
+(`ingestion_jobs.stage`) is updated before each step; on success the analysis is
+stored as a new current version in `song_analyses` and the song becomes `ready`. A
+failure marks the job and the song `failed` with the step and the error (no
+automatic retries: failures are deterministic). Reference on an RTX 5060: ~95 s per
+song with the `demucs` preset, ~220 s with `roformer`.
+
+```bash
+uv run python -m app.cli requeue <song_id>       # process again through the worker
+uv run python -m app.cli run-pipeline <song_id>  # process now, without Celery
+```
+
+Use `requeue` after changing a song's lyrics or separation preset, or to recover a
+failed song. Reprocessing stores a new analysis version; play sessions keep pointing
+at the version they were scored against.
+
 ## Running ingestion stages by hand
 
 Each pipeline stage can be run for one song without Celery (useful while developing
@@ -118,7 +137,11 @@ uv run python -m app.cli run-stage separate <song_id> --separator roformer  # sw
 uv run python -m app.cli run-stage transcribe <song_id>
 uv run python -m app.cli run-stage pitch <song_id>
 uv run python -m app.cli run-stage segment <song_id>      # no GPU, ~0.3 s
+uv run python -m app.cli run-stage persist <song_id>      # publish the analysis
 ```
+
+Each stage records its model in `work/manifest.json`, which `persist` uses to fill
+the analysis `pipeline` metadata.
 
 Pipeline order: `separate -> transcribe -> pitch -> segment` (pitch runs before
 segment so that lines are built from the hallucination-filtered transcription).

@@ -15,6 +15,7 @@ from app.domain.enums import AssetKind, SeparationPreset
 from app.ml.audio import probe_duration_ms, transcode_to_mp3
 from app.ml.separation import DemucsSeparator, RoformerSeparator, SourceSeparator
 from app.services.pipeline.errors import StageError
+from app.services.pipeline.manifest import update_manifest
 from app.storage.base import StorageBackend, StoredObject
 from app.storage.keys import asset_key
 
@@ -132,6 +133,7 @@ class SeparationStage:
             await self._session.rollback()
             raise
 
+        await update_manifest(self._storage, song_id, separator=separator.name)
         return SeparationResult(
             song_id=song_id,
             duration_ms=duration_ms,

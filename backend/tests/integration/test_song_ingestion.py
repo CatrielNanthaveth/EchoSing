@@ -1,3 +1,4 @@
+import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -7,7 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cli import register_file
 from app.db.models import IngestionJob, Song, SongAsset
+from app.db.repositories.songs import SongRepository
 from app.domain.enums import AssetKind, IngestionStage, SeparationPreset, SongStatus
+from app.services.errors import SongNotFoundError
 from app.services.song_ingestion import (
     NewSong,
     SongIngestionService,
@@ -183,3 +186,44 @@ async def test_service_default_preset_applies_when_song_has_none(
     )
 
     assert result.separation_preset is SeparationPreset.ROFORMER
+
+
+async def test_requeue_creates_a_new_queued_job(
+    service: SongIngestionService, db_session: AsyncSession, queue: FakeJobQueue
+) -> None:
+    first = await service.register_song(SONG, "song.mp3", chunks(b"audio"))
+    await SongRepository(db_session).set_status(first.song_id, SongStatus.FAILED, "x")
+    await db_session.commit()
+
+    again = await service.requeue(first.song_id)
+
+    assert again.song_id == first.song_id
+    assert again.job_id != first.job_id
+    assert again.status is SongStatus.PENDING
+    assert again.stage is IngestionStage.QUEUED
+    assert queue.enqueued == [first.job_id, again.job_id]
+    song = await db_session.get(Song, first.song_id)
+    assert song is not None
+    assert song.error_message is None
+
+
+async def test_requeue_unknown_song(service: SongIngestionService) -> None:
+    with pytest.raises(SongNotFoundError):
+        await service.requeue(uuid.uuid4())
+
+
+async def test_requeue_with_broker_down_marks_failed(
+    db_session: AsyncSession, storage: LocalStorage
+) -> None:
+    working = SongIngestionService(db_session, storage, FakeJobQueue(), MAX_BYTES)
+    registered = await working.register_song(SONG, "song.mp3", chunks(b"audio"))
+    broken = SongIngestionService(
+        db_session, storage, FakeJobQueue(fail=True), MAX_BYTES
+    )
+
+    with pytest.raises(QueueUnavailableError):
+        await broken.requeue(registered.song_id)
+
+    song = await db_session.get(Song, registered.song_id)
+    assert song is not None
+    assert song.status is SongStatus.FAILED
