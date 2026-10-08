@@ -18,6 +18,8 @@ export type LineReport = Schemas["LineReport"];
 export type LinePractice = Schemas["LinePractice"];
 export type LineAnalysis = Schemas["LineAnalysis"];
 export type PracticeWord = Schemas["PracticeWord"];
+export type LineDiagnostics = Schemas["LineDiagnostics"];
+export type WordDiagnostics = Schemas["WordDiagnostics"];
 
 // Real-time protocol (docs/ws-protocol.md).
 export type LinePitchMessage = Schemas["LinePitchMessage"];

@@ -27,6 +27,15 @@ npm run dev            # http://localhost:5173
 3. Each line is scored when it ends (score, verdict and streak); when the song ends
    the session is finished and its results open (`/sessions/{id}/results`).
 
+In the results, each sung line opens a **practice** panel: advice (flat/sharp, late/
+early), a chart of the melody vs your voice and a per-word table.
+
+**Admin diagnostics** (not linked from the app): replace `/sessions/{id}/results` with
+`/admin/sesiones/{id}` and enter the API's `ECHOSING_ADMIN_TOKEN` (kept in this
+browser). Per line it shows the voice before the latency compensation, words with
+little voice in the original (likely lyrics out of sync), word timing, scoring
+parameters, the analysis models, and a JSON download.
+
 How it works: the instrumental is decoded and played with Web Audio, and the
 microphone is analyzed in an AudioWorklet (YIN, a frame every ~10.7 ms) on the same
 `AudioContext` clock, so every pitch frame is placed exactly on the song timeline.

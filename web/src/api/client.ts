@@ -1,4 +1,5 @@
 import type {
+  LineDiagnostics,
   LinePractice,
   PitchResponse,
   SessionCreate,
@@ -81,6 +82,19 @@ export class ApiClient {
     return this.#request(
       `/sessions/${encodeURIComponent(sessionId)}/lines/${String(lineIndex)}/analysis`,
       { signal: signal ?? null },
+    );
+  }
+
+  /** Admin: everything behind a line score (needs the admin token). */
+  getLineDiagnostics(
+    sessionId: string,
+    lineIndex: number,
+    adminToken: string,
+    signal?: AbortSignal,
+  ): Promise<LineDiagnostics> {
+    return this.#request(
+      `/admin/sessions/${encodeURIComponent(sessionId)}/lines/${String(lineIndex)}/debug`,
+      { signal: signal ?? null, headers: { "X-Admin-Token": adminToken } },
     );
   }
 

@@ -1,5 +1,6 @@
 import { Link, NavLink, Route, Routes } from "react-router";
 
+import { AdminSessionPage } from "./pages/AdminSessionPage";
 import { CalibrationPage } from "./pages/CalibrationPage";
 import { CatalogPage } from "./pages/CatalogPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
@@ -23,6 +24,7 @@ export function App() {
           <Route path="/songs/:songId" element={<SongPage />} />
           <Route path="/sessions/:sessionId/results" element={<ResultsPage />} />
           <Route path="/calibrar" element={<CalibrationPage />} />
+          <Route path="/admin/sesiones/:sessionId" element={<AdminSessionPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>

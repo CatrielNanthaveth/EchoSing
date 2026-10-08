@@ -12,7 +12,7 @@ import {
 } from "recharts";
 
 import type { PracticeWord } from "../api/types";
-import { SERIES_COLORS } from "../lib/chartColors";
+import { RAW_VOICE_COLOR, SERIES_COLORS } from "../lib/chartColors";
 import { midiNoteName } from "../lib/pitch";
 import { pitchDomain, pitchTicks, type ChartRow } from "../lib/practice";
 
@@ -60,6 +60,12 @@ function PitchTooltip({ active, payload = [], label }: PitchTooltipProps) {
         {difference !== null &&
           ` (${difference >= 0 ? "+" : "−"}${Math.abs(difference).toFixed(1).replace(".", ",")} st)`}
       </p>
+      {row.rawVoice !== undefined && (
+        <p>
+          <span className="chart-swatch" style={{ background: RAW_VOICE_COLOR }} />
+          Sin compensar: {row.rawVoice === null ? "—" : midiNoteName(row.rawVoice)}
+        </p>
+      )}
     </div>
   );
 }

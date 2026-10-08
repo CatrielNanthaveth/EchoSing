@@ -8,6 +8,8 @@ export interface ChartRow {
   reference: number | null;
   /** Player's pitch (MIDI), null where there was no voice. */
   voice: number | null;
+  /** Diagnostics only: the voice before undoing the latency. */
+  rawVoice?: number | null;
 }
 
 /**

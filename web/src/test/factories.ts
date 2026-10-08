@@ -1,5 +1,6 @@
 import type {
   LineAnalysis,
+  LineDiagnostics,
   LinePractice,
   LyricLine,
   SongDetail,
@@ -103,6 +104,48 @@ export function linePractice(overrides: Partial<LinePractice> = {}): LinePractic
     ],
     status: "analyzed",
     analysis: lineAnalysis(),
+    ...overrides,
+  };
+}
+
+export function lineDiagnostics(
+  overrides: Partial<LineDiagnostics> = {},
+): LineDiagnostics {
+  return {
+    ...linePractice(),
+    latency_ms: 40,
+    scoring: {
+      scoring_hop_ms: 20,
+      min_reference_confidence: 50,
+      min_voiced_ms: 200,
+      full_credit_semitones: 0.75,
+      zero_credit_semitones: 2.5,
+      max_error_semitones: 6,
+      octave_invariant: true,
+      max_warp_ms: 200,
+      step_penalty_semitones: 2,
+      hit_threshold: 60,
+    },
+    analysis_version: 2,
+    pipeline: {
+      separator: "htdemucs",
+      transcriber: "whisper-large-v3-turbo",
+      pitch_extractor: "torchcrepe-full",
+      language: "es",
+    },
+    reference: { hop_ms: 10, midi: [57, 57], confidence: [95, 95] },
+    // 220 Hz = A3 (57), sent every 20 ms like the analysis frames.
+    sung_input: { hop_ms: 20, f0_hz: [0, 220, 220, 220, 220, 220, 220, 220, 220, 220] },
+    word_timing: [
+      { text: "Hola", start_ms: 0, end_ms: 100, voiced_ratio: 1, probability: 0.93 },
+      {
+        text: "mundo",
+        start_ms: 100,
+        end_ms: 200,
+        voiced_ratio: 0.2,
+        probability: null,
+      },
+    ],
     ...overrides,
   };
 }

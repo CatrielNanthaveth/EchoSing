@@ -4,3 +4,9 @@
  * CVD ΔE 26.8, normal-vision ΔE 31.8, contrast >= 3:1).
  */
 export const SERIES_COLORS = { reference: "#3987e5", voice: "#d95926" } as const;
+
+/** A ghost of the voice curve (diagnostics), not a series identity: neutral. */
+export const RAW_VOICE_COLOR = "#9097a8";
+
+/** Highlight of words that look out of sync (diagnostics). */
+export const SUSPICIOUS_COLOR = "#f0b429";

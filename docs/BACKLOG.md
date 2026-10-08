@@ -213,8 +213,15 @@ Una canción es *jugable* si tiene análisis actual e instrumental, sin importar
 
 ## E7 — Modo práctica
 
-- [ ] **US-7.1** Endpoint con curva de referencia y curva del usuario alineadas (path DTW).
-- [ ] **US-7.2** Gráfico de líneas comparativo en el cliente web.
+- [x] **US-7.1** Se guarda la curva cantada por verso; `analyze_line` (mismos pasos que
+  el puntaje) y `GET /sessions/{id}/lines/{n}/analysis`: curvas, camino DTW, desfase de
+  tiempo y de afinación.
+- [x] **US-7.2** Panel de práctica en los resultados: consejos, gráfico melodía vs tu
+  voz (con "corregir el ritmo") y tabla por palabra.
+- [x] **US-7.3** Diagnóstico solo admin (`/admin/sesiones/{id}`, `X-Admin-Token` hasta que
+  haya roles): voz sin compensar latencia, palabras sin voz en la original (desfase de
+  letra), tiempos por palabra, parámetros, modelos y descarga JSON.
+- [ ] **E8 (propuesta):** modo práctica en vivo: repetir un verso en loop mientras se canta.
 
 ## Fuera del MVP
 

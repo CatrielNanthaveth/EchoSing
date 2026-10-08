@@ -98,6 +98,19 @@ describe("ApiClient", () => {
     });
   });
 
+  it("sends the admin token for diagnostics", async () => {
+    const { client, fetchMock } = clientReturning(jsonResponse({}));
+
+    await client.getLineDiagnostics("x1", 2, "secret");
+
+    expect(requestedUrls(fetchMock)).toEqual([
+      "http://api.test/admin/sessions/x1/lines/2/debug",
+    ]);
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual({
+      "X-Admin-Token": "secret",
+    });
+  });
+
   it("builds media and WebSocket URLs", () => {
     expect(new ApiClient("http://api.test").instrumentalUrl("s1")).toBe(
       "http://api.test/songs/s1/instrumental",
