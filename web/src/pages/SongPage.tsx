@@ -2,13 +2,21 @@ import { useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { ApiError, api } from "../api/client";
-import type { SongDetail } from "../api/types";
+import type { SessionSummaryMessage, SongDetail } from "../api/types";
 import { LyricsView } from "../components/LyricsView";
 import { PitchMeter } from "../components/PitchMeter";
+import { ScoreCard } from "../components/ScoreCard";
 import { SongProgress } from "../components/SongProgress";
 import { useAsync } from "../hooks/useAsync";
-import type { SungLine } from "../session/lineCollector";
 import { useKaraoke } from "../session/useKaraoke";
+import { usePlaySession } from "../session/usePlaySession";
+import { loadLatency } from "../settings/latency";
+import {
+  MAX_PLAYER_NAME,
+  loadPlayerName,
+  normalizePlayerName,
+  savePlayerName,
+} from "../settings/player";
 import { NotFoundPage } from "./NotFoundPage";
 
 export function SongPage() {
@@ -32,18 +40,36 @@ export function SongPage() {
   return <Karaoke key={state.data.id} song={state.data} />;
 }
 
-/** Share of frames with a detected pitch, 0-100. */
-function voicedPercent(line: SungLine): number {
-  if (line.f0Hz.length === 0) return 0;
-  return Math.round((100 * line.f0Hz.filter((hz) => hz > 0).length) / line.f0Hz.length);
-}
-
 function Karaoke({ song }: { song: SongDetail }) {
-  const [lastLine, setLastLine] = useState<SungLine | null>(null);
-  const { phase, trackMs, microphone, play, stop } = useKaraoke(song, setLastLine);
+  const [playerName, setPlayerName] = useState(loadPlayerName);
+  const latencyMs = loadLatency();
+  const session = usePlaySession(song);
+  const karaoke = useKaraoke(song, session.sendLine, () => void session.finish());
+  const { phase } = karaoke;
 
-  const clock = phase.name === "playing" ? phase.clock : null;
-  const durationMs = trackMs ?? song.duration_ms ?? 0;
+  const sing = async () => {
+    const name = normalizePlayerName(playerName);
+    savePlayerName(name);
+    setPlayerName(name);
+    if (!(await session.start(name, latencyMs ?? 0))) return;
+    if (!(await karaoke.play())) session.close();
+  };
+
+  const stop = () => {
+    karaoke.stop();
+    session.close();
+  };
+
+  const playing = phase.name === "playing";
+  const busy = phase.name === "loading" || session.state.name === "starting";
+  const clock = playing ? phase.clock : null;
+  const durationMs = karaoke.trackMs ?? song.duration_ms ?? 0;
+  const error =
+    session.state.name === "error"
+      ? session.state.message
+      : phase.name === "error"
+        ? `No se pudo empezar: ${phase.message}`
+        : null;
 
   return (
     <section className="karaoke">
@@ -59,8 +85,35 @@ function Karaoke({ song }: { song: SongDetail }) {
 
       {durationMs > 0 && <SongProgress durationMs={durationMs} clock={clock} />}
 
+      {!playing && (
+        <div className="karaoke-setup">
+          <label>
+            Tu nombre{" "}
+            <input
+              value={playerName}
+              maxLength={MAX_PLAYER_NAME}
+              onChange={(event) => {
+                setPlayerName(event.target.value);
+              }}
+            />
+          </label>
+          <p className="muted">
+            {latencyMs === null ? (
+              <>
+                Latencia sin calibrar: <Link to="/calibrar">calibrala</Link> para un
+                puntaje justo.
+              </>
+            ) : (
+              <>
+                Latencia: {latencyMs} ms (<Link to="/calibrar">recalibrar</Link>)
+              </>
+            )}
+          </p>
+        </div>
+      )}
+
       <div className="karaoke-controls">
-        {phase.name === "playing" ? (
+        {playing ? (
           <button type="button" onClick={stop}>
             Detener
           </button>
@@ -68,34 +121,63 @@ function Karaoke({ song }: { song: SongDetail }) {
           <button
             type="button"
             className="primary"
-            disabled={phase.name === "loading"}
-            onClick={() => {
-              setLastLine(null);
-              void play();
-            }}
+            disabled={busy}
+            onClick={() => void sing()}
           >
-            {phase.name === "loading"
+            {busy
               ? "Preparando…"
-              : phase.name === "ended"
+              : session.state.name === "finished"
                 ? "Cantar de nuevo"
                 : "Cantar"}
           </button>
         )}
       </div>
 
-      {microphone !== null && <PitchMeter microphone={microphone} />}
+      {karaoke.microphone !== null && playing && (
+        <PitchMeter microphone={karaoke.microphone} />
+      )}
 
-      {lastLine !== null && (
-        <p className="line-feedback" role="status">
-          Verso {lastLine.lineIndex + 1}: voz detectada en {voicedPercent(lastLine)}%
+      {playing && session.lastScore !== null && (
+        <ScoreCard key={session.lastScore.line_index} score={session.lastScore} />
+      )}
+
+      {playing && session.connection === "reconnecting" && (
+        <p className="muted connection">Reconectando con el servidor…</p>
+      )}
+      {session.connection === "failed" && session.state.name !== "error" && (
+        <p role="alert" className="error-box">
+          Se perdió la conexión: los versos siguientes no se van a puntuar.
         </p>
       )}
 
-      {phase.name === "error" && (
+      {session.state.name === "finishing" && (
+        <p className="muted" role="status">
+          Calculando el resultado…
+        </p>
+      )}
+      {session.state.name === "finished" && (
+        <FinalScore summary={session.state.summary} />
+      )}
+
+      {error !== null && (
         <p role="alert" className="error-box">
-          No se pudo empezar: {phase.message}
+          {error}
         </p>
       )}
     </section>
+  );
+}
+
+function FinalScore({ summary }: { summary: SessionSummaryMessage }) {
+  return (
+    <div className="final-score" role="status" aria-label="Resultado final">
+      <p className="final-score-value">
+        {summary.total_score === null ? "–" : Math.round(summary.total_score)}
+      </p>
+      <p className="muted">
+        {summary.hit_lines} de {summary.scored_lines} versos acertados · mejor racha{" "}
+        {summary.best_streak}
+      </p>
+    </div>
   );
 }

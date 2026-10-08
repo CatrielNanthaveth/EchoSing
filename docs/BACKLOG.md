@@ -189,7 +189,9 @@ Una canción es *jugable* si tiene análisis actual e instrumental, sin importar
   guardada en `localStorage`. Ajuste manual opcional.
 - [x] **US-6.5** YIN en el AudioWorklet (~0.5 ms por frame), F0 por verso alineado a
   `start_ms` en el reloj de la canción (hasta `end_ms + 300 ms`), medidor de nivel y nota.
-- [ ] **US-6.6** Envío por WebSocket y feedback visual por línea.
+- [x] **US-6.6** Sesión con nombre y latencia calibrada; WebSocket con cola ordenada y
+  reconexión (reenvía solo lo no puntuado); puntaje, veredicto y racha por verso; `finish`
+  al terminar la canción con el resultado final.
 - [ ] **US-6.7** Pantalla de resultados.
 
 ## E7 — Modo práctica

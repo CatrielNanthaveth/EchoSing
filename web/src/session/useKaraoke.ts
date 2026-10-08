@@ -21,7 +21,8 @@ export interface Karaoke {
   trackMs: number | null;
   /** Open microphone (after the first play). */
   microphone: Microphone | null;
-  play: () => Promise<void>;
+  /** Start singing; resolves to false if it could not start (see `phase`). */
+  play: () => Promise<boolean>;
   stop: () => void;
 }
 
@@ -112,9 +113,12 @@ export function useKaraoke(
       // Lyrics follow what is heard, not what is scheduled.
       const latencyMs = outputLatencyMs(context);
       setPhase({ name: "playing", clock: () => player.positionMs() - latencyMs });
+      return true;
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      setPhase({ name: "error", message: microphoneErrorMessage(error) });
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        setPhase({ name: "error", message: microphoneErrorMessage(error) });
+      }
+      return false;
     }
   }, [song.id, song.lines]);
 

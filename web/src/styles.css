@@ -364,3 +364,80 @@ input {
   text-align: center;
   color: var(--muted);
 }
+
+.karaoke-setup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+.karaoke-setup p {
+  margin: 0;
+}
+
+.score-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 1.5rem auto 0;
+  animation: score-pop 350ms cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.score-card-value {
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.score-card.hit .score-card-value {
+  color: var(--good);
+}
+
+.score-card.miss .score-card-value {
+  color: var(--bad);
+}
+
+.score-card.neutral .score-card-value {
+  color: var(--muted);
+}
+
+.score-card-streak {
+  color: var(--warn);
+  font-weight: 700;
+}
+
+@keyframes score-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .score-card {
+    animation: none;
+  }
+}
+
+.connection {
+  text-align: center;
+}
+
+.final-score {
+  text-align: center;
+  margin-top: 2rem;
+}
+
+.final-score-value {
+  margin: 0;
+  font-size: 4rem;
+  font-weight: 800;
+  color: var(--accent);
+}
