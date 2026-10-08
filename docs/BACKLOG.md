@@ -132,15 +132,21 @@ EchoSing/
   `work/manifest.json`) y lo publica como nueva versión actual; la canción queda
   `ready`. Tarea Celery real (límite 1 h); CLI `requeue`, `run-pipeline` y
   `run-stage persist`. End-to-end: ~95 s (demucs) y ~220 s (roformer) por canción.
-  *Pendiente para E3:* durante un reproceso la canción deja de estar `ready`.
+  *Resuelto en E3:* el catálogo muestra las canciones jugables aunque se reprocesen.
 
 ## E3 — API de catálogo
 
-- [ ] **US-3.1** `GET /songs` (canciones READY, paginado, búsqueda).
-- [ ] **US-3.2** `GET /songs/{id}` (líneas y palabras con timestamps).
-- [ ] **US-3.3** `GET /songs/{id}/instrumental` (streaming con HTTP Range).
-- [ ] **US-3.4** `GET /songs/{id}/pitch` (curva de referencia).
-- [ ] **US-3.5** `GET /admin/songs/{id}/status`.
+Una canción es *jugable* si tiene análisis actual e instrumental, sin importar su
+`status`: durante un reproceso sigue disponible (`reprocessing: true`).
+
+- [x] **US-3.1** `GET /songs` (jugables, orden por título, búsqueda en título/artista,
+  paginado con total).
+- [x] **US-3.2** `GET /songs/{id}` (versos y palabras con timestamps + `analysis_id`;
+  solo se lee `data->'lines'` del JSONB).
+- [x] **US-3.3** `GET /songs/{id}/instrumental` (streaming con HTTP Range: 200/206/416).
+- [x] **US-3.4** `GET /songs/{id}/pitch?line=N` (curva completa o por verso).
+- [x] **US-3.5** `GET /admin/songs/{id}/status` (estado, último job, versión actual).
+- Transversal: GZip para JSON (no audio) y CORS configurable para el cliente web.
 
 ## E4 — Motor de scoring (100 % de cobertura)
 

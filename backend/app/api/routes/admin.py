@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
 from app.api.security import require_admin_token
+from app.schemas.catalog import SongStatusReport
 from app.services.song_ingestion import (
     NewSong,
     SongIngestionService,
@@ -25,6 +26,7 @@ from app.services.song_lyrics import (
     SongNotFoundError,
     get_song_lyrics_service,
 )
+from app.services.song_status import SongStatusService, get_song_status_service
 from app.storage.base import CHUNK_SIZE
 from app.workers.queue import QueueUnavailableError
 
@@ -129,3 +131,21 @@ async def set_song_lyrics(
                 }
             ]
         ) from error
+
+
+@router.get(
+    "/songs/{song_id}/status",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "Missing or invalid token"},
+        status.HTTP_404_NOT_FOUND: {"description": "Song not found"},
+    },
+)
+async def get_song_status(
+    song_id: uuid.UUID,
+    service: Annotated[SongStatusService, Depends(get_song_status_service)],
+) -> SongStatusReport:
+    """Report the status of a song and of its latest ingestion job."""
+    try:
+        return await service.get_status(song_id)
+    except SongNotFoundError as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error

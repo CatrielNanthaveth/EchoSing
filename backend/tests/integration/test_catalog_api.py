@@ -399,3 +399,57 @@ async def test_cors_exposes_range_headers(
     exposed = response.headers["access-control-expose-headers"].lower()
     assert "content-range" in exposed
     assert "accept-ranges" in exposed
+
+
+# --- US-3.4: reference pitch -----------------------------------------------------
+
+
+async def test_pitch_of_the_whole_song(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    storage: LocalStorage,
+    analysis_json: dict[str, Any],
+) -> None:
+    song_id = await add_song(db_session, storage, analysis_json, "Song")
+
+    response = await client.get(f"/songs/{song_id}/pitch")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["line_index"] is None
+    assert (body["start_ms"], body["hop_ms"]) == (0, 10)
+    assert body["midi"] == analysis_json["pitch"]["midi"]
+    assert body["confidence"] == analysis_json["pitch"]["confidence"]
+
+
+async def test_pitch_of_one_line(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    storage: LocalStorage,
+    analysis_json: dict[str, Any],
+) -> None:
+    song_id = await add_song(db_session, storage, analysis_json, "Song")
+
+    body = (await client.get(f"/songs/{song_id}/pitch", params={"line": 1})).json()
+
+    # Line 1 spans 1000-1800 ms: frames 100..179.
+    assert (body["line_index"], body["start_ms"]) == (1, 1000)
+    assert body["midi"] == analysis_json["pitch"]["midi"][100:180]
+    assert body["confidence"] == analysis_json["pitch"]["confidence"][100:180]
+
+
+async def test_pitch_errors(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    storage: LocalStorage,
+    analysis_json: dict[str, Any],
+) -> None:
+    song_id = await add_song(db_session, storage, analysis_json, "Song")
+    pending = await add_song(
+        db_session, storage, analysis_json, "Pending", analysis=False
+    )
+
+    assert (await client.get(f"/songs/{song_id}/pitch?line=3")).status_code == 404
+    assert (await client.get(f"/songs/{song_id}/pitch?line=-1")).status_code == 422
+    assert (await client.get(f"/songs/{pending}/pitch")).status_code == 404
+    assert (await client.get(f"/songs/{uuid.uuid4()}/pitch")).status_code == 404

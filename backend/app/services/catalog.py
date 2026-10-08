@@ -1,5 +1,6 @@
 """Public song catalog: listing, search and song details."""
 
+import math
 import uuid
 from typing import Annotated
 
@@ -11,11 +12,17 @@ from app.db.repositories.catalog import CatalogRepository, PlayableSong
 from app.db.repositories.song_assets import SongAssetRepository
 from app.db.session import get_db_session
 from app.domain.enums import AssetKind, SongStatus
-from app.schemas.analysis import LyricLine
-from app.schemas.catalog import SongDetail, SongPage, SongSummary
+from app.schemas.analysis import LyricLine, PitchCurve
+from app.schemas.catalog import PitchResponse, SongDetail, SongPage, SongSummary
 from app.services.errors import SongNotFoundError
 
 _LINES = TypeAdapter(list[LyricLine])
+
+
+class LineNotFoundError(Exception):
+    """The requested lyric line does not exist."""
+
+
 _IN_PROGRESS = (SongStatus.PENDING, SongStatus.PROCESSING)
 
 
@@ -55,6 +62,48 @@ class CatalogService:
         """
         self._catalog = CatalogRepository(session)
         self._assets = SongAssetRepository(session)
+
+    async def get_pitch(
+        self, song_id: uuid.UUID, line_index: int | None = None
+    ) -> PitchResponse:
+        """Get the reference pitch of a playable song, or of one of its lines.
+
+        Args:
+            song_id: Id of the song.
+            line_index: Line to restrict the curve to, or None for the song.
+
+        Returns:
+            The pitch frames and the time of the first one.
+
+        Raises:
+            SongNotFoundError: If the song does not exist or is not playable.
+            LineNotFoundError: If the line does not exist.
+        """
+        current = (
+            await self._catalog.get_current_pitch(song_id)
+            if await self._catalog.get_playable(song_id)
+            else None
+        )
+        if current is None:
+            raise SongNotFoundError(f"Song {song_id} is not available")
+        analysis_id, raw_pitch, raw_lines = current
+        curve = PitchCurve.model_validate(raw_pitch)
+        start_ms = 0
+        if line_index is not None:
+            if not 0 <= line_index < len(raw_lines):
+                raise LineNotFoundError(f"Line {line_index} does not exist")
+            line = LyricLine.model_validate(raw_lines[line_index])
+            first_frame = math.ceil(line.start_ms / curve.hop_ms)
+            start_ms = first_frame * curve.hop_ms
+            curve = curve.slice_ms(line.start_ms, line.end_ms)
+        return PitchResponse(
+            analysis_id=analysis_id,
+            line_index=line_index,
+            start_ms=start_ms,
+            hop_ms=curve.hop_ms,
+            midi=curve.midi,
+            confidence=curve.confidence,
+        )
 
     async def get_instrumental(self, song_id: uuid.UUID) -> InstrumentalAudio:
         """Locate the karaoke track of a playable song.

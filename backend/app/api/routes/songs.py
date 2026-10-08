@@ -7,8 +7,12 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, 
 from fastapi.responses import StreamingResponse
 
 from app.api.http_range import RangeNotSatisfiableError, parse_range
-from app.schemas.catalog import SongDetail, SongPage
-from app.services.catalog import CatalogService, get_catalog_service
+from app.schemas.catalog import PitchResponse, SongDetail, SongPage
+from app.services.catalog import (
+    CatalogService,
+    LineNotFoundError,
+    get_catalog_service,
+)
 from app.services.errors import SongNotFoundError
 from app.storage.base import StorageBackend
 from app.storage.dependencies import get_storage
@@ -89,3 +93,19 @@ async def stream_instrumental(
         media_type=audio.content_type,
         headers=headers,
     )
+
+
+@router.get(
+    "/{song_id}/pitch",
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Song or line not found"}},
+)
+async def get_pitch(
+    song_id: uuid.UUID,
+    service: Annotated[CatalogService, Depends(get_catalog_service)],
+    line: Annotated[int | None, Query(ge=0)] = None,
+) -> PitchResponse:
+    """Get the reference pitch of a song, or of one line with ``line``."""
+    try:
+        return await service.get_pitch(song_id, line)
+    except (SongNotFoundError, LineNotFoundError) as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error

@@ -76,6 +76,25 @@ On machines without an NVIDIA GPU (API or scoring work only), skip it with
 Settings are read from environment variables prefixed with `ECHOSING_` or from
 `backend/.env`. See [.env.example](.env.example).
 
+## Public API
+
+Interactive docs at `/docs`. Endpoints for clients (no authentication in the MVP):
+
+| Endpoint | Returns |
+|---|---|
+| `GET /songs?q=&limit=&offset=` | Playable songs ordered by title; `q` searches title and artist |
+| `GET /songs/{id}` | Song, current `analysis_id`/`analysis_version` and synced lyric lines (no pitch) |
+| `GET /songs/{id}/instrumental` | Karaoke track (MP3) with HTTP range support, so players can seek |
+| `GET /songs/{id}/pitch?line=N` | Reference pitch of the song, or of one line (`start_ms` = first frame) |
+
+A song is *playable* when it has a current analysis and an instrumental, whatever its
+status: while it is reprocessed it stays playable with `reprocessing: true`. JSON
+responses are gzipped (lyrics ~6x smaller, pitch ~4x); audio is not. Browser origins
+allowed by CORS are set with `ECHOSING_CORS_ORIGINS` (default: the Vite dev server).
+
+Admin: `GET /admin/songs/{id}/status` (with `X-Admin-Token`) reports the song status,
+its latest ingestion job and the current analysis version.
+
 ## Adding songs
 
 Songs are processed in the background by a Celery worker. Start it next to the API

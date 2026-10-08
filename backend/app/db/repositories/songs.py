@@ -231,6 +231,23 @@ class SongAnalysisRepository:
         await self._session.flush()
         return analysis
 
+    async def get_current_version(self, song_id: uuid.UUID) -> int | None:
+        """Fetch the version number of a song's current analysis.
+
+        Unlike ``get_current``, the (large) analysis data is not loaded.
+
+        Args:
+            song_id: Id of the song.
+
+        Returns:
+            The current version, or None if the song has no analysis.
+        """
+        return await self._session.scalar(
+            select(SongAnalysis.version).where(
+                SongAnalysis.song_id == song_id, SongAnalysis.is_current
+            )
+        )
+
     async def get_current(self, song_id: uuid.UUID) -> SongAnalysis | None:
         """Fetch the current analysis of a song.
 

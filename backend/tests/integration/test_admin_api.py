@@ -11,9 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.db.models import Song
-from app.db.repositories.songs import SongRepository
+from app.db.repositories.ingestion_jobs import IngestionJobRepository
+from app.db.repositories.songs import SongAnalysisRepository, SongRepository
 from app.db.session import get_db_session
-from app.domain.enums import SeparationPreset, SongStatus
+from app.domain.enums import IngestionStage, SeparationPreset, SongStatus
 from app.main import create_app
 from app.storage.dependencies import get_storage
 from app.storage.local import LocalStorage
@@ -291,3 +292,56 @@ async def test_put_lyrics_requires_token(admin_client: AsyncClient) -> None:
     )
 
     assert response.status_code == 401
+
+
+# --- ingestion status ------------------------------------------------------------
+
+
+async def test_status_of_a_song_with_its_latest_job(
+    admin_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    song = await SongRepository(db_session).add("Song", "Artist")
+    await SongRepository(db_session).set_lyrics(song.id, "Dame de tu vida")
+    jobs = IngestionJobRepository(db_session)
+    await jobs.add(song.id)
+    latest = await jobs.add(song.id)
+    await jobs.set_stage(latest, IngestionStage.FAILED, error_message="pitch: boom")
+    await db_session.commit()
+
+    response = await admin_client.get(f"/admin/songs/{song.id}/status", headers=HEADERS)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "pending"
+    assert body["separation_preset"] == "demucs"
+    assert body["has_lyrics"] is True
+    assert body["current_analysis_version"] is None
+    assert body["latest_job"]["id"] == str(latest.id)
+    assert body["latest_job"]["stage"] == "failed"
+    assert body["latest_job"]["error_message"] == "pitch: boom"
+    assert body["latest_job"]["finished_at"] is not None
+
+
+async def test_status_reports_the_current_analysis_version(
+    admin_client: AsyncClient, db_session: AsyncSession, analysis_json: dict[str, Any]
+) -> None:
+    song = await SongRepository(db_session).add("Song", "Artist")
+    analyses = SongAnalysisRepository(db_session)
+    await analyses.add_version(song.id, 1, analysis_json)
+    await analyses.add_version(song.id, 1, analysis_json)
+    await db_session.commit()
+
+    body = (
+        await admin_client.get(f"/admin/songs/{song.id}/status", headers=HEADERS)
+    ).json()
+
+    assert body["current_analysis_version"] == 2
+    assert body["latest_job"] is None
+    assert body["has_lyrics"] is False
+
+
+async def test_status_errors(admin_client: AsyncClient) -> None:
+    unknown = f"/admin/songs/{uuid.uuid4()}/status"
+
+    assert (await admin_client.get(unknown, headers=HEADERS)).status_code == 404
+    assert (await admin_client.get(unknown)).status_code == 401
