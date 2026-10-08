@@ -178,7 +178,8 @@ Una canción es *jugable* si tiene análisis actual e instrumental, sin importar
 
 ## E6 — Cliente web mínimo
 
-- [ ] **US-6.1** Scaffolding Vite + React + TS y cliente de API tipado.
+- [x] **US-6.1** Scaffolding Vite + React + TS (estricto), ESLint, Prettier, Vitest;
+  cliente de API tipado con tipos generados del OpenAPI (incluye mensajes del WS).
 - [ ] **US-6.2** Catálogo con búsqueda.
 - [ ] **US-6.3** Reproductor: instrumental + letras sincronizadas por palabra.
 - [ ] **US-6.4** Calibración de latencia (tap al oír un pitido).

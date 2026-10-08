@@ -1,0 +1,1819 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "EchoSing API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health",
+        "description": "Return the health status of the service and its dependencies.\n\nResponds with 503 when any dependency is down.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/songs": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "List Songs",
+        "description": "List the playable songs, searching title and artist with ``q``.",
+        "operationId": "list_songs_songs_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SongPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/songs/{song_id}": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Get Song",
+        "description": "Get a playable song with its synced lyrics (without the pitch curve).",
+        "operationId": "get_song_songs__song_id__get",
+        "parameters": [
+          {
+            "name": "song_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Song Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SongDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Song not available"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/songs/{song_id}/instrumental": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Stream Instrumental",
+        "description": "Stream the karaoke track, supporting HTTP range requests (seeking).",
+        "operationId": "stream_instrumental_songs__song_id__instrumental_get",
+        "parameters": [
+          {
+            "name": "song_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Song Id"
+            }
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Range"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "206": {
+            "description": "Requested byte range"
+          },
+          "404": {
+            "description": "Song not available"
+          },
+          "416": {
+            "description": "Range out of file"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/songs/{song_id}/pitch": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Get Pitch",
+        "description": "Get the reference pitch of a song, or of one line with ``line``.",
+        "operationId": "get_pitch_songs__song_id__pitch_get",
+        "parameters": [
+          {
+            "name": "song_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Song Id"
+            }
+          },
+          {
+            "name": "line",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Line"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PitchResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Song or line not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Create Session",
+        "description": "Start singing a song; scoring is bound to its current analysis.",
+        "operationId": "create_session_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionCreated"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Song not available"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/results": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Get Session Results",
+        "description": "Report a session: totals and the result of every line.",
+        "operationId": "get_session_results_sessions__session_id__results_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResults"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/songs": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Upload Song",
+        "description": "Upload a song and queue it for processing.\n\n``separation_preset`` is ``demucs`` or ``roformer``; empty means the\nserver default. ``lyrics`` are the official lyrics, one verse per line.",
+        "operationId": "upload_song_admin_songs_post",
+        "parameters": [
+          {
+            "name": "x-admin-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_song_admin_songs_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SongRegistration"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "413": {
+            "description": "File too large"
+          },
+          "415": {
+            "description": "Not an audio file"
+          },
+          "503": {
+            "description": "Queue or admin down"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/songs/{song_id}/lyrics": {
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Set Song Lyrics",
+        "description": "Set the official lyrics of a song (one verse per line).\n\nThey are used the next time the song's lines are built.",
+        "operationId": "set_song_lyrics_admin_songs__song_id__lyrics_put",
+        "parameters": [
+          {
+            "name": "song_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Song Id"
+            }
+          },
+          {
+            "name": "x-admin-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LyricsUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LyricsSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Song not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/songs/{song_id}/status": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Song Status",
+        "description": "Report the status of a song and of its latest ingestion job.",
+        "operationId": "get_song_status_admin_songs__song_id__status_get",
+        "parameters": [
+          {
+            "name": "song_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Song Id"
+            }
+          },
+          {
+            "name": "x-admin-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SongStatusReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Song not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_upload_song_admin_songs_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "artist": {
+            "type": "string",
+            "title": "Artist"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "separation_preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Separation Preset"
+          },
+          "lyrics": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lyrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "title",
+          "artist"
+        ],
+        "title": "Body_upload_song_admin_songs_post"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "title": "Status"
+          },
+          "checks": {
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "up",
+                "down"
+              ]
+            },
+            "type": "object",
+            "title": "Checks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "checks"
+        ],
+        "title": "HealthResponse",
+        "description": "Overall service health status.\n\nAttributes:\n    status: ``\"ok\"`` when every dependency is up, ``\"degraded\"`` otherwise.\n    checks: Status of each external dependency, keyed by its name."
+      },
+      "IngestionStage": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "separating",
+          "transcribing",
+          "segmenting",
+          "extracting_pitch",
+          "persisting",
+          "done",
+          "failed"
+        ],
+        "title": "IngestionStage",
+        "description": "Current stage of an ingestion job."
+      },
+      "JobReport": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/IngestionStage"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "stage",
+          "task_id",
+          "error_message",
+          "created_at",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "JobReport",
+        "description": "State of an ingestion job.\n\nAttributes:\n    id: Job id.\n    stage: Current or final stage.\n    task_id: Id of the queued task, if it was queued.\n    error_message: Failure reason, if it failed.\n    created_at: When the job was created.\n    started_at: When processing started.\n    finished_at: When it finished, successfully or not."
+      },
+      "LineReport": {
+        "properties": {
+          "line_index": {
+            "type": "integer",
+            "title": "Line Index"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "sung": {
+            "type": "boolean",
+            "title": "Sung"
+          },
+          "scorable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scorable"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy"
+          },
+          "hit": {
+            "type": "boolean",
+            "title": "Hit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "line_index",
+          "text",
+          "sung",
+          "scorable",
+          "score",
+          "accuracy",
+          "hit"
+        ],
+        "title": "LineReport",
+        "description": "Result of one lyric line in a session report.\n\nAttributes:\n    line_index: Line index.\n    text: Line text.\n    sung: Whether the player sang it (unsung lines score 0 at finish).\n    scorable: Whether the line has enough singing to be judged.\n    score: 0-100, None if not sung yet or not scorable.\n    accuracy: 0-1, None if not sung yet or not scorable.\n    hit: Whether the line was a hit."
+      },
+      "LyricLine": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Index"
+          },
+          "start_ms": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Start Ms"
+          },
+          "end_ms": {
+            "type": "integer",
+            "title": "End Ms"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text"
+          },
+          "words": {
+            "items": {
+              "$ref": "#/components/schemas/Word"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Words"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "index",
+          "start_ms",
+          "end_ms",
+          "text",
+          "words"
+        ],
+        "title": "LyricLine",
+        "description": "A line (verse) of lyrics, the unit that gets scored.\n\nAttributes:\n    index: Zero-based position of the line in the song.\n    start_ms: Start time of the line.\n    end_ms: End time (exclusive) of the line.\n    text: Full text of the line as displayed.\n    words: Words of the line, in order and without overlaps."
+      },
+      "LyricsSummary": {
+        "properties": {
+          "song_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Song Id"
+          },
+          "lines": {
+            "type": "integer",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "song_id",
+          "lines"
+        ],
+        "title": "LyricsSummary",
+        "description": "Result of saving the lyrics of a song.\n\nAttributes:\n    song_id: Id of the song.\n    lines: Number of sung lines found in the lyrics."
+      },
+      "LyricsUpdate": {
+        "properties": {
+          "lyrics": {
+            "type": "string",
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Lyrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lyrics"
+        ],
+        "title": "LyricsUpdate",
+        "description": "Official lyrics submitted for a song.\n\nAttributes:\n    lyrics: Plain text, one verse per line. Empty lines, ``[Section]``\n        labels and lines fully in parentheses are ignored."
+      },
+      "PitchResponse": {
+        "properties": {
+          "analysis_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Analysis Id"
+          },
+          "line_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line Index"
+          },
+          "start_ms": {
+            "type": "integer",
+            "title": "Start Ms"
+          },
+          "hop_ms": {
+            "type": "integer",
+            "title": "Hop Ms"
+          },
+          "midi": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Midi"
+          },
+          "confidence": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Confidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "analysis_id",
+          "line_index",
+          "start_ms",
+          "hop_ms",
+          "midi",
+          "confidence"
+        ],
+        "title": "PitchResponse",
+        "description": "Reference pitch of a song, or of one of its lines.\n\nAttributes:\n    analysis_id: Id of the analysis the curve belongs to.\n    line_index: The requested line, or None for the whole song.\n    start_ms: Time of the first frame returned.\n    hop_ms: Time between frames.\n    midi: Pitch per frame as fractional MIDI note; None without estimate.\n    confidence: Voicing confidence per frame, 0-100."
+      },
+      "PlaySessionStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "finished"
+        ],
+        "title": "PlaySessionStatus",
+        "description": "Lifecycle of a karaoke play session."
+      },
+      "SeparationPreset": {
+        "type": "string",
+        "enum": [
+          "demucs",
+          "roformer"
+        ],
+        "title": "SeparationPreset",
+        "description": "Source separation configuration chosen for a song.\n\nAttributes:\n    DEMUCS: Demucs ``htdemucs`` with several shifts. Fast, light on VRAM.\n    ROFORMER: BS-RoFormer model (audio-separator). Several times slower and\n        heavier on VRAM, but cleaner on some songs."
+      },
+      "SessionCreate": {
+        "properties": {
+          "song_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Song Id"
+          },
+          "player_name": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Player Name"
+          },
+          "latency_offset_ms": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": -500.0,
+            "title": "Latency Offset Ms",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "song_id",
+          "player_name"
+        ],
+        "title": "SessionCreate",
+        "description": "Request to start singing a song.\n\nAttributes:\n    song_id: Song to sing (must be playable).\n    player_name: Display name of the anonymous player.\n    latency_offset_ms: Audio latency measured by the client's calibration;\n        positive when the voice arrives late."
+      },
+      "SessionCreated": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "song_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Song Id"
+          },
+          "analysis_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Analysis Id"
+          },
+          "analysis_version": {
+            "type": "integer",
+            "title": "Analysis Version"
+          },
+          "line_count": {
+            "type": "integer",
+            "title": "Line Count"
+          },
+          "player_name": {
+            "type": "string",
+            "title": "Player Name"
+          },
+          "latency_offset_ms": {
+            "type": "integer",
+            "title": "Latency Offset Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "song_id",
+          "analysis_id",
+          "analysis_version",
+          "line_count",
+          "player_name",
+          "latency_offset_ms"
+        ],
+        "title": "SessionCreated",
+        "description": "A started play session.\n\nAttributes:\n    session_id: Id of the session (used by the WebSocket).\n    song_id: Song being sung.\n    analysis_id: Analysis version the session is scored against.\n    analysis_version: Version number of that analysis.\n    line_count: Number of lyric lines to sing.\n    player_name: Display name of the player.\n    latency_offset_ms: Latency applied when scoring."
+      },
+      "SessionResults": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "song_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Song Id"
+          },
+          "analysis_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Analysis Id"
+          },
+          "player_name": {
+            "type": "string",
+            "title": "Player Name"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PlaySessionStatus"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/SessionTotals"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/LineReport"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "song_id",
+          "analysis_id",
+          "player_name",
+          "status",
+          "started_at",
+          "finished_at",
+          "totals",
+          "lines"
+        ],
+        "title": "SessionResults",
+        "description": "Report of a play session.\n\nAttributes:\n    session_id: Session id.\n    song_id: Song sung.\n    analysis_id: Analysis the session was scored against.\n    player_name: Display name of the player.\n    status: ``active`` or ``finished``.\n    started_at: When the session started.\n    finished_at: When it finished, if it did.\n    totals: Totals over the lines scored so far (all lines once finished).\n    lines: One entry per lyric line, in order."
+      },
+      "SessionTotals": {
+        "properties": {
+          "total_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Score"
+          },
+          "accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy"
+          },
+          "best_streak": {
+            "type": "integer",
+            "title": "Best Streak"
+          },
+          "scored_lines": {
+            "type": "integer",
+            "title": "Scored Lines"
+          },
+          "hit_lines": {
+            "type": "integer",
+            "title": "Hit Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_score",
+          "accuracy",
+          "best_streak",
+          "scored_lines",
+          "hit_lines"
+        ],
+        "title": "SessionTotals",
+        "description": "Totals of a performance.\n\nAttributes:\n    total_score: 0-100 weighted by line length; None if nothing scorable.\n    accuracy: Fraction of in-tune frames; None if nothing scorable.\n    best_streak: Longest run of consecutive hit lines.\n    scored_lines: Scorable lines included.\n    hit_lines: Lines that were hits."
+      },
+      "SongDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "artist": {
+            "type": "string",
+            "title": "Artist"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "line_count": {
+            "type": "integer",
+            "title": "Line Count"
+          },
+          "reprocessing": {
+            "type": "boolean",
+            "title": "Reprocessing"
+          },
+          "analysis_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Analysis Id"
+          },
+          "analysis_version": {
+            "type": "integer",
+            "title": "Analysis Version"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/LyricLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "artist",
+          "language",
+          "duration_ms",
+          "line_count",
+          "reprocessing",
+          "analysis_id",
+          "analysis_version",
+          "lines"
+        ],
+        "title": "SongDetail",
+        "description": "A playable song with its synced lyrics.\n\nAttributes:\n    analysis_id: Id of the current analysis; play sessions are bound to it.\n    analysis_version: Version number of the current analysis.\n    lines: Lyric lines with timed words (the pitch curve is served apart)."
+      },
+      "SongPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SongSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "SongPage",
+        "description": "A page of catalog songs.\n\nAttributes:\n    items: Songs in this page, ordered by title.\n    total: Songs matching the query across all pages.\n    limit: Max songs per page requested.\n    offset: Songs skipped before this page."
+      },
+      "SongRegistration": {
+        "properties": {
+          "song_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Song Id"
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SongStatus"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/IngestionStage"
+          },
+          "separation_preset": {
+            "$ref": "#/components/schemas/SeparationPreset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "song_id",
+          "job_id",
+          "status",
+          "stage",
+          "separation_preset"
+        ],
+        "title": "SongRegistration",
+        "description": "Result of registering a song.\n\nAttributes:\n    song_id: Id of the new song.\n    job_id: Id of the ingestion job created for it.\n    status: Status of the song.\n    stage: Stage of the ingestion job.\n    separation_preset: Preset that will be used to split the song."
+      },
+      "SongStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "processing",
+          "ready",
+          "failed"
+        ],
+        "title": "SongStatus",
+        "description": "Lifecycle of a song in the catalog."
+      },
+      "SongStatusReport": {
+        "properties": {
+          "song_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Song Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "artist": {
+            "type": "string",
+            "title": "Artist"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SongStatus"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "separation_preset": {
+            "$ref": "#/components/schemas/SeparationPreset"
+          },
+          "has_lyrics": {
+            "type": "boolean",
+            "title": "Has Lyrics"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "current_analysis_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Analysis Version"
+          },
+          "latest_job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "song_id",
+          "title",
+          "artist",
+          "status",
+          "error_message",
+          "separation_preset",
+          "has_lyrics",
+          "duration_ms",
+          "current_analysis_version",
+          "latest_job"
+        ],
+        "title": "SongStatusReport",
+        "description": "Ingestion status of a song, for administrators.\n\nAttributes:\n    song_id: Song id.\n    title: Song title.\n    artist: Performing artist.\n    status: Lifecycle status of the song.\n    error_message: Last failure reason, if any.\n    separation_preset: Preset used to split vocals and instrumental.\n    has_lyrics: Whether official lyrics are loaded.\n    duration_ms: Duration, once known.\n    current_analysis_version: Version that is playable, if any.\n    latest_job: Most recent ingestion job, if any."
+      },
+      "SongSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "artist": {
+            "type": "string",
+            "title": "Artist"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "line_count": {
+            "type": "integer",
+            "title": "Line Count"
+          },
+          "reprocessing": {
+            "type": "boolean",
+            "title": "Reprocessing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "artist",
+          "language",
+          "duration_ms",
+          "line_count",
+          "reprocessing"
+        ],
+        "title": "SongSummary",
+        "description": "A playable song as listed in the catalog.\n\nAttributes:\n    id: Song id.\n    title: Song title.\n    artist: Performing artist.\n    language: ISO 639-1 code of the lyrics, if known.\n    duration_ms: Duration of the song.\n    line_count: Number of lyric lines (scoring units).\n    reprocessing: True while a newer analysis is being produced; the song\n        stays playable with its current one."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "Word": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text"
+          },
+          "start_ms": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Start Ms"
+          },
+          "end_ms": {
+            "type": "integer",
+            "title": "End Ms"
+          },
+          "probability": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probability"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text",
+          "start_ms",
+          "end_ms"
+        ],
+        "title": "Word",
+        "description": "A transcribed word with its timing.\n\nAttributes:\n    text: The word as transcribed, including attached punctuation.\n    start_ms: Start time from the beginning of the song.\n    end_ms: End time (exclusive); greater than ``start_ms``.\n    probability: Transcriber confidence in [0, 1], if available."
+      },
+      "ErrorCode": {
+        "description": "Machine-readable error codes sent over the WebSocket.",
+        "enum": [
+          "invalid_message",
+          "unknown_line",
+          "line_already_scored"
+        ],
+        "title": "ErrorCode",
+        "type": "string"
+      },
+      "ErrorMessage": {
+        "description": "Server -> client: a message could not be processed (connection stays open).\n\nAttributes:\n    type: Message type.\n    code: What went wrong.\n    detail: Human-readable explanation.",
+        "properties": {
+          "type": {
+            "const": "error",
+            "default": "error",
+            "title": "Type",
+            "type": "string"
+          },
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "detail"
+        ],
+        "title": "ErrorMessage",
+        "type": "object"
+      },
+      "FinishMessage": {
+        "description": "Client -> server: the song is over; compute the totals and close.\n\nAttributes:\n    type: Message type.",
+        "properties": {
+          "type": {
+            "const": "finish",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "FinishMessage",
+        "type": "object"
+      },
+      "LinePitchMessage": {
+        "description": "Client -> server: the pitch the player sang over one line.\n\nAttributes:\n    type: Message type.\n    line_index: Line that was sung.\n    hop_ms: Time between pitch frames.\n    f0_hz: Pitch per frame in Hz, from the line start (0 = no voice). Send a\n        little more than the line (~300 ms) for latency compensation.",
+        "properties": {
+          "type": {
+            "const": "line_pitch",
+            "title": "Type",
+            "type": "string"
+          },
+          "line_index": {
+            "minimum": 0,
+            "title": "Line Index",
+            "type": "integer"
+          },
+          "hop_ms": {
+            "maximum": 50,
+            "minimum": 5,
+            "title": "Hop Ms",
+            "type": "number"
+          },
+          "f0_hz": {
+            "items": {
+              "maximum": 5000,
+              "minimum": 0,
+              "type": "number"
+            },
+            "maxItems": 6000,
+            "title": "F0 Hz",
+            "type": "array"
+          }
+        },
+        "required": [
+          "type",
+          "line_index",
+          "hop_ms",
+          "f0_hz"
+        ],
+        "title": "LinePitchMessage",
+        "type": "object"
+      },
+      "LineScoreMessage": {
+        "description": "Server -> client: the score of a sung line.\n\nAttributes:\n    type: Message type.\n    line_index: Line that was scored.\n    scorable: False when the line has too little singing to judge.\n    score: 0-100, None if not scorable.\n    accuracy: Fraction of in-tune frames, None if not scorable.\n    hit: Whether the line counts towards the streak.\n    streak: Consecutive hits ending at this line.",
+        "properties": {
+          "type": {
+            "const": "line_score",
+            "default": "line_score",
+            "title": "Type",
+            "type": "string"
+          },
+          "line_index": {
+            "title": "Line Index",
+            "type": "integer"
+          },
+          "scorable": {
+            "title": "Scorable",
+            "type": "boolean"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy"
+          },
+          "hit": {
+            "title": "Hit",
+            "type": "boolean"
+          },
+          "streak": {
+            "title": "Streak",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "line_index",
+          "scorable",
+          "score",
+          "accuracy",
+          "hit",
+          "streak"
+        ],
+        "title": "LineScoreMessage",
+        "type": "object"
+      },
+      "ReadyMessage": {
+        "description": "Server -> client: the session is open and ready to score lines.\n\nAttributes:\n    type: Message type.\n    session_id: Id of the session.\n    analysis_id: Analysis the lines are scored against.\n    line_count: Number of lyric lines.\n    scored_lines: Lines already scored (when reconnecting).",
+        "properties": {
+          "type": {
+            "const": "ready",
+            "default": "ready",
+            "title": "Type",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "analysis_id": {
+            "format": "uuid",
+            "title": "Analysis Id",
+            "type": "string"
+          },
+          "line_count": {
+            "title": "Line Count",
+            "type": "integer"
+          },
+          "scored_lines": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Scored Lines",
+            "type": "array"
+          }
+        },
+        "required": [
+          "session_id",
+          "analysis_id",
+          "line_count",
+          "scored_lines"
+        ],
+        "title": "ReadyMessage",
+        "type": "object"
+      },
+      "SessionSummaryMessage": {
+        "description": "Server -> client: final totals, sent right before closing.\n\nAttributes:\n    type: Message type.",
+        "properties": {
+          "total_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Score"
+          },
+          "accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy"
+          },
+          "best_streak": {
+            "title": "Best Streak",
+            "type": "integer"
+          },
+          "scored_lines": {
+            "title": "Scored Lines",
+            "type": "integer"
+          },
+          "hit_lines": {
+            "title": "Hit Lines",
+            "type": "integer"
+          },
+          "type": {
+            "const": "session_summary",
+            "default": "session_summary",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "total_score",
+          "accuracy",
+          "best_streak",
+          "scored_lines",
+          "hit_lines"
+        ],
+        "title": "SessionSummaryMessage",
+        "type": "object"
+      }
+    }
+  }
+}
