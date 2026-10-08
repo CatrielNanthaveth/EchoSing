@@ -6,7 +6,7 @@ import pytest
 from app.scoring.dtw import accumulate, band_mask, dtw
 
 
-def naive_dtw(cost: np.ndarray) -> float:
+def naive_dtw(cost: np.ndarray, penalty: float = 0.0) -> float:
     """Reference implementation: plain double loop (tests only)."""
     rows, columns = cost.shape
     total = np.full((rows + 1, columns + 1), np.inf)
@@ -14,23 +14,64 @@ def naive_dtw(cost: np.ndarray) -> float:
     for i in range(1, rows + 1):
         for j in range(1, columns + 1):
             total[i, j] = cost[i - 1, j - 1] + min(
-                total[i - 1, j - 1], total[i - 1, j], total[i, j - 1]
+                total[i - 1, j - 1],
+                total[i - 1, j] + penalty,
+                total[i, j - 1] + penalty,
             )
     return float(total[rows, columns])
 
 
-def naive_optimal_cells(cost: np.ndarray) -> set[tuple[int, int]]:
+def naive_optimal_cells(cost: np.ndarray, penalty: float = 0.0) -> set[tuple[int, int]]:
     """Cells on any optimal path, by exhaustive forward/backward (tests only)."""
     rows, columns = cost.shape
-    best = naive_dtw(cost)
+    best = naive_dtw(cost, penalty)
     cells: set[tuple[int, int]] = set()
     for i in range(rows):
         for j in range(columns):
-            before = naive_dtw(cost[: i + 1, : j + 1])
-            after = naive_dtw(cost[i:, j:])
+            before = naive_dtw(cost[: i + 1, : j + 1], penalty)
+            after = naive_dtw(cost[i:, j:], penalty)
             if np.isclose(before + after - cost[i, j], best):
                 cells.add((i, j))
     return cells
+
+
+@pytest.mark.parametrize("seed", range(15))
+@pytest.mark.parametrize("penalty", [0.3, 1.0])
+def test_step_penalty_matches_the_naive_implementation(
+    seed: int, penalty: float
+) -> None:
+    rng = np.random.default_rng(300 + seed)
+    cost = rng.uniform(0, 6, size=(rng.integers(1, 20), rng.integers(1, 20)))
+
+    assert dtw(cost, step_penalty=penalty).total_cost == pytest.approx(
+        naive_dtw(cost, penalty)
+    )
+
+
+@pytest.mark.parametrize("seed", range(6))
+def test_on_path_mask_with_step_penalty(seed: int) -> None:
+    rng = np.random.default_rng(400 + seed)
+    cost = rng.integers(0, 3, size=(rng.integers(1, 7), rng.integers(1, 7))).astype(
+        float
+    )
+
+    result = dtw(cost, step_penalty=0.5)
+
+    assert set(zip(*np.nonzero(result.on_path), strict=True)) == naive_optimal_cells(
+        cost, 0.5
+    )
+
+
+def test_step_penalty_keeps_the_path_on_the_diagonal() -> None:
+    # Off-diagonal cells are slightly cheaper, but not enough to pay the detour.
+    cost = np.full((5, 5), 0.2)
+    np.fill_diagonal(cost, 0.3)
+
+    free = dtw(cost)
+    penalized = dtw(cost, step_penalty=1.0)
+
+    assert not free.on_path[np.diag_indices(5)].all()
+    np.testing.assert_array_equal(penalized.on_path, np.eye(5, dtype=bool))
 
 
 @pytest.mark.parametrize("seed", range(30))

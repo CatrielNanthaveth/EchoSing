@@ -38,11 +38,13 @@ class DTWResult:
     row_costs: FloatArray
 
 
-def accumulate(cost: FloatArray) -> FloatArray:
+def accumulate(cost: FloatArray, step_penalty: float = 0.0) -> FloatArray:
     """Accumulated DTW cost with steps (1, 1), (1, 0) and (0, 1).
 
     Args:
         cost: Local cost matrix ``(n, m)``; ``inf`` marks forbidden cells.
+        step_penalty: Extra cost of every horizontal or vertical step, so the
+            path leaves the diagonal only when timing really differs.
 
     Returns:
         Matrix ``(n + 1, m + 1)`` where entry ``[i, j]`` is the cheapest path
@@ -78,6 +80,8 @@ def accumulate(cost: FloatArray) -> FloatArray:
         # i + 1; (i - 1, j - 1) is on the one before at column i.
         active = best[: end - start]
         np.minimum(previous[start:end], previous[start + 1 : end + 1], out=active)
+        if step_penalty:
+            np.add(active, step_penalty, out=active)
         np.minimum(active, before_previous[start:end], out=active)
         np.add(
             skew_cost[diagonal, start + 1 : end + 1],
@@ -152,13 +156,16 @@ def band_mask(rows: int, columns: int, band_ratio: float) -> BoolArray:
     return mask
 
 
-def dtw(cost: FloatArray, band_ratio: float | None = None) -> DTWResult:
+def dtw(
+    cost: FloatArray, band_ratio: float | None = None, step_penalty: float = 0.0
+) -> DTWResult:
     """Align a reference with a sung curve given their local cost matrix.
 
     Args:
         cost: Local cost ``(n, m)``: reference frames in rows, sung frames in
             columns. Must be finite and non-negative.
         band_ratio: Sakoe-Chiba band (see ``band_mask``), or None for none.
+        step_penalty: Extra cost of every horizontal or vertical step.
 
     Returns:
         The optimal cost, the on-path mask and the per-reference-frame cost.
@@ -173,8 +180,10 @@ def dtw(cost: FloatArray, band_ratio: float | None = None) -> DTWResult:
     if band_ratio is not None:
         local = np.where(band_mask(rows, columns, band_ratio), local, np.inf)
 
-    forward = accumulate(local)[1:, 1:]
-    backward = accumulate(local[::-1, ::-1])[1:, 1:][::-1, ::-1]
+    # Step penalties sit on the edges between cells, so the cost of the best
+    # path through a cell is still forward + backward - cell.
+    forward = accumulate(local, step_penalty)[1:, 1:]
+    backward = accumulate(local[::-1, ::-1], step_penalty)[1:, 1:][::-1, ::-1]
     total_cost = float(forward[-1, -1])
 
     with np.errstate(invalid="ignore"):  # inf - inf outside the band
