@@ -10,6 +10,9 @@ from pydantic import ValidationError
 
 from app.api.security import require_admin_token
 from app.schemas.catalog import SongStatusReport
+from app.schemas.practice import LineDiagnostics
+from app.services.play_sessions import SessionNotFoundError, UnknownLineError
+from app.services.practice import PracticeService, get_practice_service
 from app.services.song_ingestion import (
     NewSong,
     SongIngestionService,
@@ -148,4 +151,23 @@ async def get_song_status(
     try:
         return await service.get_status(song_id)
     except SongNotFoundError as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+
+
+@router.get(
+    "/sessions/{session_id}/lines/{line_index}/debug",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "Missing or invalid token"},
+        status.HTTP_404_NOT_FOUND: {"description": "Session or line not found"},
+    },
+)
+async def get_line_diagnostics(
+    session_id: uuid.UUID,
+    line_index: int,
+    service: Annotated[PracticeService, Depends(get_practice_service)],
+) -> LineDiagnostics:
+    """Everything behind a line score: raw inputs, parameters and word timing."""
+    try:
+        return await service.diagnostics(session_id, line_index)
+    except (SessionNotFoundError, UnknownLineError) as error:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error

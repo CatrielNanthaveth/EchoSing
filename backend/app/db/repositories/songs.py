@@ -252,6 +252,27 @@ class SongAnalysisRepository:
         ).first()
         return None if row is None else (row[0], row[1])
 
+    async def get_metadata(
+        self, analysis_id: uuid.UUID
+    ) -> tuple[int, dict[str, Any]] | None:
+        """Fetch the version and pipeline info of an analysis (no lines/pitch).
+
+        Args:
+            analysis_id: Id of the analysis.
+
+        Returns:
+            The version and the raw ``pipeline`` value, or None if it does not
+            exist.
+        """
+        row = (
+            await self._session.execute(
+                select(SongAnalysis.version, SongAnalysis.data["pipeline"]).where(
+                    SongAnalysis.id == analysis_id
+                )
+            )
+        ).first()
+        return None if row is None else (row[0], row[1])
+
     async def get_current_identity(
         self, song_id: uuid.UUID
     ) -> tuple[uuid.UUID, int] | None:

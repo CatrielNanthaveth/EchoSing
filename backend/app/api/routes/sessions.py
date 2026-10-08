@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, status
 from fastapi.websockets import WebSocketDisconnect
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
+from app.schemas.practice import LinePractice
 from app.schemas.sessions import (
     ClientMessage,
     ErrorCode,
@@ -27,6 +28,7 @@ from app.services.play_sessions import (
     UnknownLineError,
     get_play_session_service,
 )
+from app.services.practice import PracticeService, get_practice_service
 
 router = APIRouter(tags=["sessions"])
 
@@ -65,6 +67,22 @@ async def get_session_results(
     try:
         return await service.get_results(session_id)
     except SessionNotFoundError as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+
+
+@router.get(
+    "/sessions/{session_id}/lines/{line_index}/analysis",
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Session or line not found"}},
+)
+async def get_line_analysis(
+    session_id: uuid.UUID,
+    line_index: int,
+    service: Annotated[PracticeService, Depends(get_practice_service)],
+) -> LinePractice:
+    """How one line was sung: reference vs sung curves, offsets and score."""
+    try:
+        return await service.practice(session_id, line_index)
+    except (SessionNotFoundError, UnknownLineError) as error:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
 
 

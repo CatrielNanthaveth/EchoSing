@@ -278,15 +278,22 @@ instrument overtones, so the instrumental can sound duller where they were remov
 
 | Endpoint | Does |
 |---|---|
-| `POST /sessions` | Starts a session (`song_id`, `player_name`, `latency_offset_ms`) bound to the song's current analysis |
+| `POST /sessions` | Starts a session (`song_id`, `player_name`, `latency_offset_ms`, `difficulty`) bound to the song's current analysis |
 | `WS /ws/sessions/{id}` | Scores each sung line in real time (protocol: `docs/ws-protocol.md`) |
 | `GET /sessions/{id}/results` | Totals and the result of every line |
+| `GET /sessions/{id}/lines/{n}/analysis` | How a line was sung (practice chart): reference vs sung curves, the alignment, timing and pitch offsets |
+| `GET /admin/sessions/{id}/lines/{n}/debug` | Admin (`X-Admin-Token`): the analysis plus raw inputs, scoring parameters, analysis version/models and per-word voicing |
 
 The client sends the pitch it measured over each line (`line_pitch`) and gets its
 score and the live streak back (`line_score`); `finish` closes the session and returns
-the totals. Line scores are stored as they arrive, so a reconnection resumes where it
-left off. Unsung lines count as 0 in the final totals but are not stored, so reports
-tell "sung badly" from "not sung".
+the totals. Line scores are stored as they arrive, with the sung curve, so a
+reconnection resumes where it left off and lines can be analyzed later. Unsung lines
+count as 0 in the final totals but are not stored, so reports tell "sung badly" from
+"not sung".
+
+The line analysis (`app/scoring/analysis.py`) runs the same steps as the score, so
+charts always match it. In diagnostics, a word whose `voiced_ratio` is low while it
+should be sung points to lyrics out of sync with the vocals.
 
 ## Scoring engine
 
