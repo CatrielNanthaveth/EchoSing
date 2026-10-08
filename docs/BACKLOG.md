@@ -110,7 +110,10 @@ EchoSing/
   `run-stage transcribe`. ~20–25 s por canción, ~5.2 GB de VRAM. El filtro
   `--hallucination_silence_threshold` de Whisper está desactivado: en rap descartaba
   frases reales.
-- [ ] **US-2.4 Segmentación en líneas.** Servicio puro (pausas, puntuación, largo máximo).
+- [x] **US-2.4 Segmentación en líneas.** Función pura `segment_lines` (mayúsculas de
+  inicio de verso, puntuación, pausas ≥ 1 s, división de líneas > 8 s / 14 palabras,
+  unión de líneas cortas); artefacto `work/lines.json`; CLI `run-stage segment`
+  (sin GPU, ~0.3 s). Respaldo para canciones sin letra oficial.
 - [ ] **US-2.7 Letras oficiales alineadas** *(adelantada: va después de US-2.4)*. El
   admin carga la letra correcta; el texto sale de la letra y los tiempos de Whisper.
   Motivo: con rap rápido Whisper comete errores que el usuario de karaoke nota primero.

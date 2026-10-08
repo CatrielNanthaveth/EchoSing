@@ -5,6 +5,7 @@ Usage (from ``backend/``)::
     uv run python -m app.cli add-song song.mp3 --title "Title" --artist "Artist"
     uv run python -m app.cli run-stage separate <song_id> [--separator roformer]
     uv run python -m app.cli run-stage transcribe <song_id>
+    uv run python -m app.cli run-stage segment <song_id>
 
 ``run-stage`` runs a single ingestion stage synchronously, without Celery. It is
 meant for development and for re-processing one song by hand.
@@ -25,6 +26,7 @@ from pydantic import BaseModel
 from app.core.config import Settings, get_settings
 from app.db.session import create_engine, create_session_factory
 from app.domain.enums import SeparationPreset
+from app.services.pipeline.segmentation import SegmentationResult, SegmentationStage
 from app.services.pipeline.separation import build_separation_stage
 from app.services.pipeline.transcription import (
     TranscriptionResult,
@@ -40,7 +42,7 @@ from app.storage.local import LocalStorage
 from app.workers.celery_app import celery_app
 from app.workers.queue import CeleryJobQueue
 
-STAGES = ("separate", "transcribe")
+STAGES = ("separate", "transcribe", "segment")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -137,6 +139,8 @@ async def _run_stage(args: argparse.Namespace, settings: Settings) -> BaseModel:
     try:
         async with create_session_factory(engine)() as session:
             storage = LocalStorage(settings.storage_root)
+            if args.stage == "segment":
+                return await SegmentationStage(storage).run(args.song_id)
             if args.stage == "transcribe":
                 transcription = build_transcription_stage(session, storage, settings)
                 return await transcription.run(args.song_id)
@@ -146,11 +150,16 @@ async def _run_stage(args: argparse.Namespace, settings: Settings) -> BaseModel:
         await engine.dispose()
 
 
-def summarize(result: BaseModel) -> str:
-    """Render a stage result for the terminal.
+def _format_ms(ms: int) -> str:
+    minutes, seconds = divmod(ms / 1000, 60)
+    return f"{int(minutes)}:{seconds:05.2f}"
 
-    Transcriptions can hold hundreds of words, so only the text and the first
-    word timings are shown; the full result is saved by the stage.
+
+def summarize(result: BaseModel) -> str:
+    """Render a command result for the terminal.
+
+    Transcriptions and lyric lines can be long, so they are rendered as text;
+    the full result is saved by the stage. Anything else is shown as JSON.
 
     Args:
         result: Result returned by a command.
@@ -158,6 +167,16 @@ def summarize(result: BaseModel) -> str:
     Returns:
         Text to print.
     """
+    if isinstance(result, SegmentationResult):
+        lines = result.lyrics.lines
+        return "\n".join(
+            [f"lines: {len(lines)} | saved to: {result.artifact_key}"]
+            + [
+                f"{line.index:>3} [{_format_ms(line.start_ms)} - "
+                f"{_format_ms(line.end_ms)}] {line.text}"
+                for line in lines
+            ]
+        )
     if not isinstance(result, TranscriptionResult):
         return result.model_dump_json(indent=2)
     transcription = result.transcription

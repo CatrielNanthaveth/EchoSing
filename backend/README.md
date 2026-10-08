@@ -116,12 +116,14 @@ or to re-process a song; needs the `ml` group):
 uv run python -m app.cli run-stage separate <song_id>
 uv run python -m app.cli run-stage separate <song_id> --separator roformer  # switch preset
 uv run python -m app.cli run-stage transcribe <song_id>
+uv run python -m app.cli run-stage segment <song_id>      # no GPU, ~0.3 s
 ```
 
 | Stage | Tool | Produces |
 |---|---|---|
 | `separate` | Separation preset (subprocess) + FFmpeg | `vocals.flac` (input for transcription and pitch), `instrumental.mp3` 192 kbps (streamed to clients), `songs.duration_ms` |
 | `transcribe` | Whisper `large-v3-turbo` CLI (subprocess) on `vocals.flac` | `work/transcription.json` (timed words; intermediate artifact, not an asset), `songs.language` if it was unknown |
+| `segment` | `app/services/lyrics.py` (pure Python) | `work/lines.json` (lyric lines with timed words) |
 
 ### Transcription
 
@@ -139,6 +141,20 @@ slower and at the edge of 8 GB of VRAM. The output is then cleaned up:
 
 Reference on an RTX 5060: ~20–25 s per song with cached weights, ~5.2 GB of VRAM.
 The first run downloads the turbo weights (~1.5 GB).
+
+### Line segmentation
+
+Fallback used when no official lyrics are loaded. Whisper stretches each word up to
+the next one (the median gap between words is 0 ms), so pauses are a weak cue; the
+main cue is the capital letter Whisper puts at the start of each verse. Rules, in
+order (thresholds in `SegmentationConfig`):
+
+1. a new line starts at a capitalized word (not after an article/preposition, and
+   not inside proper nouns like "Peter Pan" unless the word is a common verse opener
+   such as "Que"), after `.?!`, at `¿`/`¡` and after pauses of 1 s or more;
+2. lines over 8 s or 14 words are split at a comma, else the largest pause, else the
+   middle, never right after an article/preposition when avoidable;
+3. lines under 2 words or 0.8 s are merged into the closest neighbor if it fits.
 
 MP3 encoders prepend a short silence (~25 ms) that browsers may not trim; it is a
 constant offset absorbed by the client's latency calibration.
