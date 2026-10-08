@@ -187,7 +187,8 @@ Una canción es *jugable* si tiene análisis actual e instrumental, sin importar
 - [x] **US-6.4** Calibración de latencia por micrófono: 8 pitidos a 100 BPM, el jugador
   aplaude con cada uno; mediana de los desfases (salida + entrada) sin atípicos,
   guardada en `localStorage`. Ajuste manual opcional.
-- [ ] **US-6.5** Micrófono + YIN en AudioWorklet, F0 acumulado por línea.
+- [x] **US-6.5** YIN en el AudioWorklet (~0.5 ms por frame), F0 por verso alineado a
+  `start_ms` en el reloj de la canción (hasta `end_ms + 300 ms`), medidor de nivel y nota.
 - [ ] **US-6.6** Envío por WebSocket y feedback visual por línea.
 - [ ] **US-6.7** Pantalla de resultados.
 

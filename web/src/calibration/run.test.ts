@@ -70,7 +70,8 @@ describe("calibrate", () => {
     for (let i = 0; i < 700; i++) {
       const time = i / 100;
       const clap = beeps.some((beep) => time >= beep + 0.12 && time < beep + 0.17);
-      for (const listener of listeners) listener({ time, rms: clap ? 0.3 : 0.002 });
+      for (const listener of listeners)
+        listener({ time, rms: clap ? 0.3 : 0.002, f0: 0, clarity: 0 });
     }
     await vi.runAllTimersAsync();
 

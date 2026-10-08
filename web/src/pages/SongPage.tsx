@@ -1,21 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { ApiError, api } from "../api/client";
 import type { SongDetail } from "../api/types";
-import { getAudioContext, loadTrack, outputLatencyMs } from "../audio/context";
-import { Playback } from "../audio/playback";
 import { LyricsView } from "../components/LyricsView";
+import { PitchMeter } from "../components/PitchMeter";
 import { SongProgress } from "../components/SongProgress";
 import { useAsync } from "../hooks/useAsync";
+import type { SungLine } from "../session/lineCollector";
+import { useKaraoke } from "../session/useKaraoke";
 import { NotFoundPage } from "./NotFoundPage";
-
-type Phase =
-  | { name: "idle" }
-  | { name: "loading" }
-  | { name: "playing"; clock: () => number }
-  | { name: "ended" }
-  | { name: "error"; message: string };
 
 export function SongPage() {
   const { songId = "" } = useParams();
@@ -38,55 +32,15 @@ export function SongPage() {
   return <Karaoke key={state.data.id} song={state.data} />;
 }
 
+/** Share of frames with a detected pitch, 0-100. */
+function voicedPercent(line: SungLine): number {
+  if (line.f0Hz.length === 0) return 0;
+  return Math.round((100 * line.f0Hz.filter((hz) => hz > 0).length) / line.f0Hz.length);
+}
+
 function Karaoke({ song }: { song: SongDetail }) {
-  const [phase, setPhase] = useState<Phase>({ name: "idle" });
-  const [trackMs, setTrackMs] = useState<number | null>(null);
-  const playback = useRef<Playback | null>(null);
-  const loading = useRef<AbortController | null>(null);
-
-  useEffect(
-    () => () => {
-      loading.current?.abort();
-      playback.current?.stop();
-    },
-    [],
-  );
-
-  const play = useCallback(async () => {
-    const context = getAudioContext();
-    try {
-      await context.resume();
-      if (playback.current === null) {
-        setPhase({ name: "loading" });
-        loading.current = new AbortController();
-        const buffer = await loadTrack(
-          context,
-          api.instrumentalUrl(song.id),
-          loading.current.signal,
-        );
-        playback.current = new Playback(context, buffer);
-        setTrackMs(playback.current.durationMs);
-      }
-      const player = playback.current;
-      player.start(() => {
-        setPhase({ name: "ended" });
-      });
-      // Lyrics follow what is heard, not what is scheduled.
-      const latencyMs = outputLatencyMs(context);
-      setPhase({ name: "playing", clock: () => player.positionMs() - latencyMs });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      setPhase({
-        name: "error",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }, [song.id]);
-
-  const stop = () => {
-    playback.current?.stop();
-    setPhase({ name: "idle" });
-  };
+  const [lastLine, setLastLine] = useState<SungLine | null>(null);
+  const { phase, trackMs, microphone, play, stop } = useKaraoke(song, setLastLine);
 
   const clock = phase.name === "playing" ? phase.clock : null;
   const durationMs = trackMs ?? song.duration_ms ?? 0;
@@ -115,20 +69,31 @@ function Karaoke({ song }: { song: SongDetail }) {
             type="button"
             className="primary"
             disabled={phase.name === "loading"}
-            onClick={() => void play()}
+            onClick={() => {
+              setLastLine(null);
+              void play();
+            }}
           >
             {phase.name === "loading"
-              ? "Descargando pista…"
+              ? "Preparando…"
               : phase.name === "ended"
                 ? "Cantar de nuevo"
-                : "Reproducir"}
+                : "Cantar"}
           </button>
         )}
       </div>
 
+      {microphone !== null && <PitchMeter microphone={microphone} />}
+
+      {lastLine !== null && (
+        <p className="line-feedback" role="status">
+          Verso {lastLine.lineIndex + 1}: voz detectada en {voicedPercent(lastLine)}%
+        </p>
+      )}
+
       {phase.name === "error" && (
         <p role="alert" className="error-box">
-          No se pudo reproducir: {phase.message}
+          No se pudo empezar: {phase.message}
         </p>
       )}
     </section>

@@ -1,3 +1,5 @@
+import { Yin } from "./yin";
+
 /** Name the AudioWorklet processor is registered under. */
 export const VOICE_PROCESSOR = "voice-processor";
 
@@ -6,12 +8,19 @@ export const WINDOW_SIZE = 2048;
 /** Samples between frames (~10.7 ms at 48 kHz). */
 export const HOP_SIZE = 512;
 
+/** Window RMS below which there is no voice (~-46 dBFS); skips pitch search. */
+export const SILENCE_RMS = 0.005;
+
 /** One analysis frame of microphone audio. */
 export interface VoiceFrame {
   /** AudioContext time (s) of the center of the analysis window. */
   time: number;
   /** RMS level of the central hop of the window (sharp in time, for onsets). */
   rms: number;
+  /** Pitch in Hz, 0 when unvoiced or silent. */
+  f0: number;
+  /** 0-1 periodicity of the window (0 when silent). */
+  clarity: number;
 }
 
 /**
@@ -26,6 +35,7 @@ export class FrameAnalyzer {
   readonly #emit: (frame: VoiceFrame) => void;
   readonly #window: Float32Array;
   readonly #hopSize: number;
+  readonly #yin: Yin;
   /** Samples received since the last frame. */
   #pending = 0;
   /** Valid samples in the window (it starts empty). */
@@ -41,6 +51,7 @@ export class FrameAnalyzer {
     this.#emit = emit;
     this.#window = new Float32Array(windowSize);
     this.#hopSize = hopSize;
+    this.#yin = new Yin(sampleRate, windowSize);
   }
 
   /**
@@ -73,13 +84,19 @@ export class FrameAnalyzer {
     const centerFrame = endFrame - size / 2;
     const hopStart = (size - this.#hopSize) / 2;
     let energy = 0;
-    for (let i = hopStart; i < hopStart + this.#hopSize; i++) {
+    let hopEnergy = 0;
+    for (let i = 0; i < size; i++) {
       const sample = this.#window[i] ?? 0;
       energy += sample * sample;
+      if (i >= hopStart && i < hopStart + this.#hopSize) hopEnergy += sample * sample;
     }
+    const silent = Math.sqrt(energy / size) < SILENCE_RMS;
+    const pitch = silent ? { f0: 0, clarity: 0 } : this.#yin.estimate(this.#window);
     this.#emit({
       time: centerFrame / this.#sampleRate,
-      rms: Math.sqrt(energy / this.#hopSize),
+      rms: Math.sqrt(hopEnergy / this.#hopSize),
+      f0: pitch.f0,
+      clarity: pitch.clarity,
     });
   }
 }

@@ -16,7 +16,12 @@ function recording(
   for (let i = 0; i * HOP_S < durationS; i++) {
     const time = i * HOP_S;
     const clap = claps.some((start) => time >= start && time < start + 0.05);
-    frames.push({ time, rms: clap ? 0.3 : noise * (1 + (i % 3) / 2) });
+    frames.push({
+      time,
+      rms: clap ? 0.3 : noise * (1 + (i % 3) / 2),
+      f0: 0,
+      clarity: 0,
+    });
   }
   return frames;
 }

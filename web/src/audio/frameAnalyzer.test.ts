@@ -55,3 +55,22 @@ describe("FrameAnalyzer", () => {
     expect(levelAt(112)).toBeCloseTo(0.5);
   });
 });
+
+describe("FrameAnalyzer pitch", () => {
+  it("detects the pitch of each frame and skips silence", () => {
+    const rate = 48_000;
+    const samples = Float32Array.from({ length: rate / 2 }, (_, i) =>
+      i < rate / 4 ? 0 : 0.3 * Math.sin((2 * Math.PI * 220 * i) / rate),
+    );
+    const frames: VoiceFrame[] = [];
+    const analyzer = new FrameAnalyzer(rate, (frame) => frames.push(frame));
+    for (let start = 0; start < samples.length; start += 128) {
+      analyzer.push(samples.subarray(start, start + 128), start);
+    }
+
+    const silent = frames.filter((frame) => frame.time < 0.2);
+    const sung = frames.filter((frame) => frame.time > 0.3);
+    expect(silent.every((frame) => frame.f0 === 0 && frame.clarity === 0)).toBe(true);
+    expect(sung.every((frame) => Math.abs(frame.f0 - 220) < 1)).toBe(true);
+  });
+});
