@@ -115,3 +115,43 @@ def test_summarize_other_results_as_json() -> None:
     )
 
     assert '"status": "pending"' in summarize(registration)
+
+
+def test_lyrics_options_are_parsed() -> None:
+    parser = build_parser()
+
+    add_song = parser.parse_args(
+        ["add-song", "s.mp3", "--title", "T", "--artist", "A", "--lyrics", "l.txt"]
+    )
+    set_lyrics = parser.parse_args(
+        ["set-lyrics", "0e0b2cdf-45cb-48b0-8b06-e558286f0c18", "l.txt"]
+    )
+
+    assert add_song.lyrics == Path("l.txt")
+    assert set_lyrics.path == Path("l.txt")
+
+
+@pytest.mark.parametrize("command", ["add-song", "set-lyrics"])
+def test_missing_lyrics_file_fails_without_touching_services(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], command: str
+) -> None:
+    audio = tmp_path / "song.mp3"
+    audio.write_bytes(b"x")
+    missing = tmp_path / "missing.txt"
+    argv = (
+        [
+            "add-song",
+            str(audio),
+            "--title",
+            "T",
+            "--artist",
+            "A",
+            "--lyrics",
+            str(missing),
+        ]
+        if command == "add-song"
+        else ["set-lyrics", "0e0b2cdf-45cb-48b0-8b06-e558286f0c18", str(missing)]
+    )
+
+    assert main(argv) == 1
+    assert "File not found" in capsys.readouterr().err

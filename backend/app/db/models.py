@@ -47,6 +47,8 @@ class Song(Base):
         str_enum(SongStatus, "song_status"), default=SongStatus.PENDING, index=True
     )
     error_message: Mapped[str | None] = mapped_column(Text)
+    # Official lyrics as plain text (one verse per line), when provided.
+    lyrics_text: Mapped[str | None] = mapped_column(Text)
     separation_preset: Mapped[SeparationPreset] = mapped_column(
         str_enum(SeparationPreset, "separation_preset"),
         default=SeparationPreset.DEMUCS,

@@ -78,6 +78,11 @@ markers = [
     "integration: requires the docker compose services (run with -m integration)",
 ]
 
+[tool.coverage.run]
+# SQLAlchemy's asyncio layer switches greenlets; without this, lines after an
+# awaited database call are reported as not covered.
+concurrency = ["greenlet", "thread"]
+
 [dependency-groups]
 dev = [
     "celery-types>=0.26.0",

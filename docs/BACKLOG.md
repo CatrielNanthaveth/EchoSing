@@ -114,9 +114,12 @@ EchoSing/
   inicio de verso, puntuación, pausas ≥ 1 s, división de líneas > 8 s / 14 palabras,
   unión de líneas cortas); artefacto `work/lines.json`; CLI `run-stage segment`
   (sin GPU, ~0.3 s). Respaldo para canciones sin letra oficial.
-- [ ] **US-2.7 Letras oficiales alineadas** *(adelantada: va después de US-2.4)*. El
-  admin carga la letra correcta; el texto sale de la letra y los tiempos de Whisper.
-  Motivo: con rap rápido Whisper comete errores que el usuario de karaoke nota primero.
+- [x] **US-2.7 Letras oficiales alineadas** *(adelantada: va después de US-2.4)*.
+  `songs.lyrics_text`; carga por `POST /admin/songs` (campo `lyrics`),
+  `PUT /admin/songs/{id}/lyrics` y CLI (`add-song --lyrics`, `set-lyrics`).
+  `align_lyrics` (difflib): texto y versos de la letra, tiempos de Whisper, palabras
+  omitidas interpoladas; rechazo si coincide < 50%. La etapa `segment` la usa cuando
+  hay letra. Canciones de prueba: 99% y 98% de coincidencia.
 - [ ] **US-2.5 F0 de referencia.** `PitchExtractor` → CREPE, curva por línea con máscara
   de voicing. Incluye la **capa B anti-alucinaciones**: descartar palabras transcriptas
   en tramos donde CREPE no detecta voz.

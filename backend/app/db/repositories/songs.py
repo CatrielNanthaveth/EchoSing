@@ -108,6 +108,23 @@ class SongRepository:
         await self._session.flush()
         return True
 
+    async def set_lyrics(self, song_id: uuid.UUID, lyrics_text: str | None) -> bool:
+        """Record the official lyrics of a song.
+
+        Args:
+            song_id: Id of the song.
+            lyrics_text: Lyrics as plain text, or None to remove them.
+
+        Returns:
+            True if the song exists and was updated.
+        """
+        song = await self._session.get(Song, song_id)
+        if song is None:
+            return False
+        song.lyrics_text = lyrics_text
+        await self._session.flush()
+        return True
+
     async def set_language(self, song_id: uuid.UUID, language: str) -> bool:
         """Record the lyrics language of a song.
 

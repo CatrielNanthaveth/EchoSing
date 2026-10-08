@@ -123,7 +123,7 @@ uv run python -m app.cli run-stage segment <song_id>      # no GPU, ~0.3 s
 |---|---|---|
 | `separate` | Separation preset (subprocess) + FFmpeg | `vocals.flac` (input for transcription and pitch), `instrumental.mp3` 192 kbps (streamed to clients), `songs.duration_ms` |
 | `transcribe` | Whisper `large-v3-turbo` CLI (subprocess) on `vocals.flac` | `work/transcription.json` (timed words; intermediate artifact, not an asset), `songs.language` if it was unknown |
-| `segment` | `app/services/lyrics.py` (pure Python) | `work/lines.json` (lyric lines with timed words) |
+| `segment` | `app/services/lyrics.py` (pure Python) | `work/lines.json` (lyric lines with timed words; from the official lyrics when the song has them) |
 
 ### Transcription
 
@@ -141,6 +141,31 @@ slower and at the edge of 8 GB of VRAM. The output is then cleaned up:
 
 Reference on an RTX 5060: ~20–25 s per song with cached weights, ~5.2 GB of VRAM.
 The first run downloads the turbo weights (~1.5 GB).
+
+### Official lyrics
+
+Loading the official lyrics is the recommended way to get correct karaoke text:
+the lyrics provide the text and the line breaks, and the transcription only
+provides timings.
+
+```bash
+uv run python -m app.cli add-song song.mp3 --title "T" --artist "A" --lyrics song.txt
+uv run python -m app.cli set-lyrics <song_id> song.txt       # add or fix them later
+uv run python -m app.cli run-stage segment <song_id>         # rebuild the lines
+```
+
+Or via the API: `lyrics` form field on `POST /admin/songs`, or
+`PUT /admin/songs/{id}/lyrics` with `{"lyrics": "..."}`.
+
+Format: UTF-8 text, one verse per line, **complete as sung** (no "chorus x2").
+Empty lines, `[Section]` labels and lines fully in parentheses (backing vocals, which
+the transcriber rarely captures) are ignored.
+
+Alignment (`align_lyrics`) compares words ignoring case, accents and punctuation:
+matched words take the transcribed timing, misheard ones share the time of what was
+heard, missed ones are interpolated between their neighbors and extra transcribed
+words are ignored. If fewer than 50% of the words match, the lyrics are rejected
+(incomplete, abbreviated or from another song). Test songs: 99% and 98% matched.
 
 ### Line segmentation
 

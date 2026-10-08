@@ -1,3 +1,4 @@
+import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.db.models import Song
+from app.db.repositories.songs import SongRepository
 from app.db.session import get_db_session
 from app.domain.enums import SeparationPreset, SongStatus
 from app.main import create_app
@@ -218,3 +220,74 @@ async def test_unknown_preset_returns_422(admin_client: AsyncClient) -> None:
     )
 
     assert response.status_code == 422
+
+
+# --- official lyrics -----------------------------------------------------------
+
+
+async def test_upload_with_lyrics_stores_them(
+    admin_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    response = await admin_client.post(
+        "/admin/songs",
+        data={**FORM, "lyrics": "Dame de tu vida\nY de tu tiempo"},
+        files=_file(),
+        headers=HEADERS,
+    )
+
+    assert response.status_code == 202
+    song = await db_session.scalar(select(Song))
+    assert song is not None
+    assert song.lyrics_text == "Dame de tu vida\nY de tu tiempo"
+
+
+async def test_put_lyrics_sets_them(
+    admin_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    song = await SongRepository(db_session).add("Song", "Artist")
+
+    response = await admin_client.put(
+        f"/admin/songs/{song.id}/lyrics",
+        json={"lyrics": "[Coro]\nDame de tu vida\n\nY de tu tiempo\n(uh uh)"},
+        headers=HEADERS,
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"song_id": str(song.id), "lines": 2}
+    await db_session.refresh(song)
+    assert song.lyrics_text is not None
+    assert song.lyrics_text.startswith("[Coro]")
+
+
+async def test_put_lyrics_unknown_song_returns_404(admin_client: AsyncClient) -> None:
+    response = await admin_client.put(
+        f"/admin/songs/{uuid.uuid4()}/lyrics",
+        json={"lyrics": "Dame de tu vida"},
+        headers=HEADERS,
+    )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "body",
+    [{"lyrics": ""}, {"lyrics": "[Coro]\n\n(uh uh)"}, {}, {"lyrics": "x" * 20_001}],
+)
+async def test_put_invalid_lyrics_returns_422(
+    admin_client: AsyncClient, db_session: AsyncSession, body: dict[str, str]
+) -> None:
+    song = await SongRepository(db_session).add("Song", "Artist")
+
+    response = await admin_client.put(
+        f"/admin/songs/{song.id}/lyrics", json=body, headers=HEADERS
+    )
+
+    assert response.status_code == 422
+
+
+async def test_put_lyrics_requires_token(admin_client: AsyncClient) -> None:
+    response = await admin_client.put(
+        f"/admin/songs/{uuid.uuid4()}/lyrics", json={"lyrics": "Dame"}
+    )
+
+    assert response.status_code == 401

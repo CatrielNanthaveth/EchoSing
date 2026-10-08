@@ -15,6 +15,9 @@ htmlcov/
 # Local storage data (anchored: must not match the app/storage/ code package)
 /backend/storage/
 
+# Test songs and their lyrics (copyrighted material, local only)
+/docs/songs/
+
 # Generated media
 *.mp3
 *.wav

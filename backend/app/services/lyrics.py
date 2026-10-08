@@ -1,11 +1,18 @@
 """Pure functions that turn timed words into lyric lines.
 
-Segmentation here is the fallback used when no official lyrics are available:
-it relies on cues Whisper leaves in sung transcriptions (a capital letter at the
-start of each verse, sentence punctuation) and on long pauses, then enforces
-line length limits suited to per-line scoring.
+Two strategies:
+
+- ``align_lyrics``: official lyrics provide the text and the line breaks; the
+  transcription only provides timings. This is the preferred path.
+- ``segment_lines``: fallback when no official lyrics are available. It relies
+  on cues Whisper leaves in sung transcriptions (a capital letter at the start
+  of each verse, sentence punctuation) and on long pauses, then enforces line
+  length limits suited to per-line scoring.
 """
 
+import difflib
+import re
+import unicodedata
 from collections.abc import Sequence
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -225,3 +232,279 @@ def _to_line(index: int, chunk: Chunk) -> LyricLine:
             for word in chunk
         ],
     )
+
+
+# --- Official lyrics alignment -------------------------------------------------
+
+MIN_ALIGNED_WORD_MS = 10
+# Duration assumed for words that must be placed before the first or after the
+# last word recognized by the transcriber.
+FALLBACK_WORD_MS = 300
+MAX_LYRICS_CHARS = 20_000
+_SECTION_LABEL = re.compile(r"^\[.*\]$")
+_BACKING_VOCALS = re.compile(r"^\(.*\)$")
+
+
+class LyricsMismatchError(ValueError):
+    """The official lyrics do not match the transcribed audio well enough."""
+
+
+class AlignmentReport(BaseModel):
+    """How well the official lyrics matched the transcription.
+
+    Attributes:
+        lyric_words: Words in the official lyrics.
+        matched_words: Official words found verbatim in the transcription.
+        replaced_words: Official words timed from different transcribed words.
+        interpolated_words: Official words the transcriber missed, timed by
+            interpolation between their neighbors.
+        unused_transcribed_words: Transcribed words with no official
+            counterpart (ad-libs, backing vocals or hallucinations).
+    """
+
+    lyric_words: int
+    matched_words: int
+    replaced_words: int
+    interpolated_words: int
+    unused_transcribed_words: int
+
+    @property
+    def match_ratio(self) -> float:
+        """Fraction of official words found verbatim in the transcription."""
+        return self.matched_words / self.lyric_words if self.lyric_words else 0.0
+
+
+class AlignedLyrics(BaseModel):
+    """Official lyrics with word timings.
+
+    Attributes:
+        lines: Lines of the official lyrics, with timed words.
+        report: Alignment quality metrics.
+    """
+
+    lines: list[LyricLine]
+    report: AlignmentReport
+
+
+def parse_lyrics_text(text: str) -> list[str]:
+    """Extract the sung lines from lyrics text.
+
+    One verse per line. Empty lines (stanza breaks), section labels such as
+    ``[Coro]`` and lines fully in parentheses (backing vocals, rarely captured
+    by the transcriber) are skipped. Inner whitespace is collapsed.
+
+    Args:
+        text: Lyrics as plain text.
+
+    Returns:
+        The lines to display and score, in order.
+    """
+    lines: list[str] = []
+    for raw in text.splitlines():
+        line = " ".join(raw.split())
+        if line and not _SECTION_LABEL.match(line) and not _BACKING_VOCALS.match(line):
+            lines.append(line)
+    return lines
+
+
+def normalize_word(text: str) -> str:
+    """Comparison key of a word: casefolded, without accents or punctuation.
+
+    Args:
+        text: A word as written.
+
+    Returns:
+        Its letters and digits only, e.g. ``"Créemelo,"`` -> ``"creemelo"``.
+    """
+    decomposed = unicodedata.normalize("NFKD", text.casefold())
+    return "".join(
+        char
+        for char in decomposed
+        if char.isalnum() and not unicodedata.combining(char)
+    )
+
+
+def _split_line(line: str) -> list[str]:
+    """Split a line into words, attaching punctuation-only tokens to a neighbor."""
+    words: list[str] = []
+    pending = ""
+    for token in line.split():
+        if not normalize_word(token):
+            if words:
+                words[-1] += token
+            else:
+                pending += token
+            continue
+        words.append(pending + token)
+        pending = ""
+    return words
+
+
+def _distribute(start: int, end: int, weights: Sequence[int]) -> list[tuple[int, int]]:
+    """Split ``[start, end)`` into consecutive spans proportional to ``weights``.
+
+    Every span lasts at least ``MIN_ALIGNED_WORD_MS``; the caller guarantees
+    ``end - start >= len(weights) * MIN_ALIGNED_WORD_MS``.
+    """
+    spare = end - start - len(weights) * MIN_ALIGNED_WORD_MS
+    total = sum(weights)
+    spans: list[tuple[int, int]] = []
+    cursor = start
+    accumulated = 0
+    for index, weight in enumerate(weights):
+        accumulated += weight
+        # Cumulative rounding keeps the total exact.
+        extra = spare * accumulated // total
+        span_end = (
+            end
+            if index == len(weights) - 1
+            else start + (index + 1) * MIN_ALIGNED_WORD_MS + extra
+        )
+        spans.append((cursor, span_end))
+        cursor = span_end
+    return spans
+
+
+def align_lyrics(
+    lines: Sequence[str],
+    transcribed: Sequence[TranscribedWord],
+    *,
+    min_match_ratio: float = 0.5,
+) -> AlignedLyrics:
+    """Time the words of official lyrics using a transcription.
+
+    Words are compared by ``normalize_word`` and aligned as sequences, so the
+    alignment survives missing, extra and misheard words:
+
+    - matched words take the transcribed timing;
+    - misheard words share the time span of the words heard in their place;
+    - words the transcriber missed are interpolated between their neighbors
+      (borrowing time from them when Whisper left no gap);
+    - extra transcribed words are ignored.
+
+    Args:
+        lines: Official lyric lines (see ``parse_lyrics_text``).
+        transcribed: Transcribed words with strictly increasing times.
+        min_match_ratio: Minimum fraction of official words that must be found
+            in the transcription.
+
+    Returns:
+        The official lines with timed words and a quality report.
+
+    Raises:
+        LyricsMismatchError: If there is nothing to align or too few words
+            match (lyrics incomplete, abbreviated or from another song).
+    """
+    official = [(line_index, word) for line_index, line in enumerate(lines)
+                for word in _split_line(line)]  # fmt: skip
+    if not official:
+        raise LyricsMismatchError("The lyrics contain no words")
+    if not transcribed:
+        raise LyricsMismatchError("The transcription contains no words to align with")
+
+    official_keys = [normalize_word(word) for _, word in official]
+    heard_keys = [normalize_word(word.text) for word in transcribed]
+    matcher = difflib.SequenceMatcher(None, official_keys, heard_keys, autojunk=False)
+
+    times: list[tuple[int, int] | None] = [None] * len(official)
+    matched = replaced = unused = 0
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            for offset in range(i2 - i1):
+                heard = transcribed[j1 + offset]
+                times[i1 + offset] = (heard.start_ms, heard.end_ms)
+            matched += i2 - i1
+        elif tag == "replace":
+            span_start, span_end = transcribed[j1].start_ms, transcribed[j2 - 1].end_ms
+            weights = [max(len(key), 1) for key in official_keys[i1:i2]]
+            if span_end - span_start >= len(weights) * MIN_ALIGNED_WORD_MS:
+                times[i1:i2] = _distribute(span_start, span_end, weights)
+                replaced += i2 - i1
+            # else: too many words for the span, interpolate them below.
+            unused += max((j2 - j1) - (i2 - i1), 0)
+        elif tag == "insert":
+            unused += j2 - j1
+
+    report = AlignmentReport(
+        lyric_words=len(official),
+        matched_words=matched,
+        replaced_words=replaced,
+        interpolated_words=sum(span is None for span in times),
+        unused_transcribed_words=unused,
+    )
+    if report.match_ratio < min_match_ratio:
+        raise LyricsMismatchError(
+            f"Only {report.match_ratio:.0%} of the lyrics match the audio "
+            f"(minimum {min_match_ratio:.0%}): are they incomplete, abbreviated "
+            "(e.g. 'chorus x2') or from another song?"
+        )
+
+    resolved = _interpolate_missing(times, official_keys)
+    return AlignedLyrics(lines=_build_lines(lines, official, resolved), report=report)
+
+
+def _interpolate_missing(
+    times: list[tuple[int, int] | None], keys: Sequence[str]
+) -> list[tuple[int, int]]:
+    """Fill the words without timing, keeping times strictly increasing.
+
+    Each run of untimed words is placed in the gap between its timed
+    neighbors. When the gap is too small (Whisper usually stretches words up
+    to the next one), the window grows outwards to include timed neighbors,
+    which are re-timed together with the run. Words before the first or after
+    the last timed word get ``FALLBACK_WORD_MS`` each.
+    """
+    spans = list(times)
+    total = len(spans)
+    index = 0
+    while index < total:
+        if spans[index] is not None:
+            index += 1
+            continue
+        low, high = index, index  # window of words to (re)distribute: [low, high)
+        while high < total and spans[high] is None:
+            high += 1
+        while True:
+            count = high - low
+            after = spans[high] if high < total else None
+            before = spans[low - 1] if low > 0 else None
+            if before is not None and after is not None:
+                start, end = before[1], after[0]
+            elif before is not None:  # after the last timed word
+                start, end = before[1], before[1] + count * FALLBACK_WORD_MS
+            elif after is not None:  # before the first timed word
+                start, end = max(after[0] - count * FALLBACK_WORD_MS, 0), after[0]
+            else:  # no timed word at all
+                start, end = 0, count * FALLBACK_WORD_MS
+            if end - start >= count * MIN_ALIGNED_WORD_MS:
+                break
+            # Not enough room: also re-time the closest timed neighbor.
+            if low > 0:
+                low -= 1
+            else:
+                high += 1
+        weights = [max(len(key), 1) for key in keys[low:high]]
+        spans[low:high] = _distribute(start, end, weights)
+        index = high
+    return [span for span in spans if span is not None]
+
+
+def _build_lines(
+    lines: Sequence[str],
+    official: Sequence[tuple[int, str]],
+    spans: Sequence[tuple[int, int]],
+) -> list[LyricLine]:
+    """Group timed official words back into their lines."""
+    words_by_line: list[list[Word]] = [[] for _ in lines]
+    for (line_index, text), (start, end) in zip(official, spans, strict=True):
+        words_by_line[line_index].append(Word(text=text, start_ms=start, end_ms=end))
+    return [
+        LyricLine(
+            index=index,
+            start_ms=words[0].start_ms,
+            end_ms=words[-1].end_ms,
+            text=" ".join(word.text for word in words),
+            words=words,
+        )
+        for index, words in enumerate(line for line in words_by_line if line)
+    ]

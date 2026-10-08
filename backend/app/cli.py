@@ -3,6 +3,7 @@
 Usage (from ``backend/``)::
 
     uv run python -m app.cli add-song song.mp3 --title "Title" --artist "Artist"
+    uv run python -m app.cli set-lyrics <song_id> lyrics.txt
     uv run python -m app.cli run-stage separate <song_id> [--separator roformer]
     uv run python -m app.cli run-stage transcribe <song_id>
     uv run python -m app.cli run-stage segment <song_id>
@@ -37,6 +38,7 @@ from app.services.song_ingestion import (
     SongIngestionService,
     SongRegistration,
 )
+from app.services.song_lyrics import SongLyricsService
 from app.storage.base import CHUNK_SIZE
 from app.storage.local import LocalStorage
 from app.workers.celery_app import celery_app
@@ -65,6 +67,15 @@ def build_parser() -> argparse.ArgumentParser:
         choices=list(SeparationPreset),
         help="Separation preset (default: server setting)",
     )
+    add_song.add_argument(
+        "--lyrics", type=Path, help="Official lyrics file (UTF-8, one verse per line)"
+    )
+
+    set_lyrics = commands.add_parser(
+        "set-lyrics", help="Set the official lyrics of a song"
+    )
+    set_lyrics.add_argument("song_id", type=uuid.UUID)
+    set_lyrics.add_argument("path", type=Path, help="Lyrics file (UTF-8)")
 
     run_stage = commands.add_parser(
         "run-stage", help="Run one ingestion stage for a song, without Celery"
@@ -110,7 +121,21 @@ async def register_file(
     return await service.register_song(song, path.name, read_file_chunks(path))
 
 
-async def _add_song(args: argparse.Namespace, settings: Settings) -> BaseModel:
+async def _set_lyrics(
+    args: argparse.Namespace, settings: Settings, lyrics: str
+) -> BaseModel:
+    """Wire the real dependencies and save a song's lyrics."""
+    engine = create_engine(settings.database_url)
+    try:
+        async with create_session_factory(engine)() as session:
+            return await SongLyricsService(session).set_lyrics(args.song_id, lyrics)
+    finally:
+        await engine.dispose()
+
+
+async def _add_song(
+    args: argparse.Namespace, settings: Settings, lyrics: str | None
+) -> BaseModel:
     """Wire the real dependencies and register the song."""
     engine = create_engine(settings.database_url)
     try:
@@ -127,6 +152,7 @@ async def _add_song(args: argparse.Namespace, settings: Settings) -> BaseModel:
                 artist=args.artist,
                 language=args.language,
                 separation_preset=args.separator,
+                lyrics=lyrics,
             )
             return await register_file(service, args.path, song)
     finally:
@@ -140,7 +166,7 @@ async def _run_stage(args: argparse.Namespace, settings: Settings) -> BaseModel:
         async with create_session_factory(engine)() as session:
             storage = LocalStorage(settings.storage_root)
             if args.stage == "segment":
-                return await SegmentationStage(storage).run(args.song_id)
+                return await SegmentationStage(session, storage).run(args.song_id)
             if args.stage == "transcribe":
                 transcription = build_transcription_stage(session, storage, settings)
                 return await transcription.run(args.song_id)
@@ -169,8 +195,20 @@ def summarize(result: BaseModel) -> str:
     """
     if isinstance(result, SegmentationResult):
         lines = result.lyrics.lines
+        header = [
+            f"source: {result.lyrics.source} | lines: {len(lines)} "
+            f"| saved to: {result.artifact_key}"
+        ]
+        report = result.lyrics.alignment
+        if report is not None:
+            header.append(
+                f"alignment: {report.matched_words}/{report.lyric_words} words "
+                f"matched ({report.match_ratio:.0%}), {report.replaced_words} "
+                f"replaced, {report.interpolated_words} interpolated, "
+                f"{report.unused_transcribed_words} transcribed words unused"
+            )
         return "\n".join(
-            [f"lines: {len(lines)} | saved to: {result.artifact_key}"]
+            header
             + [
                 f"{line.index:>3} [{_format_ms(line.start_ms)} - "
                 f"{_format_ms(line.end_ms)}] {line.text}"
@@ -212,11 +250,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     settings = get_settings()
 
-    if args.command == "add-song":
-        if not args.path.is_file():
-            print(f"File not found: {args.path}", file=sys.stderr)
-            return 1
-        result = asyncio.run(_add_song(args, settings))
+    if args.command in ("add-song", "set-lyrics"):
+        lyrics_path = args.path if args.command == "set-lyrics" else args.lyrics
+        for path in (args.path, lyrics_path):
+            if path is not None and not path.is_file():
+                print(f"File not found: {path}", file=sys.stderr)
+                return 1
+        if args.command == "set-lyrics":
+            lyrics_text = args.path.read_text("utf-8")
+            result = asyncio.run(_set_lyrics(args, settings, lyrics_text))
+        else:
+            lyrics = lyrics_path.read_text("utf-8") if lyrics_path else None
+            result = asyncio.run(_add_song(args, settings, lyrics))
     else:
         started = time.perf_counter()
         result = asyncio.run(_run_stage(args, settings))

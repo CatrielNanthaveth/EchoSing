@@ -16,6 +16,7 @@ from app.db.repositories.song_assets import SongAssetRepository
 from app.db.repositories.songs import SongRepository
 from app.db.session import get_db_session
 from app.domain.enums import AssetKind, IngestionStage, SeparationPreset, SongStatus
+from app.services.lyrics import MAX_LYRICS_CHARS
 from app.storage.base import StorageBackend
 from app.storage.dependencies import get_storage
 from app.storage.keys import asset_key, song_prefix
@@ -47,6 +48,7 @@ class NewSong(BaseModel):
         language: ISO 639-1 code of the lyrics language, if known.
         separation_preset: How to split vocals and instrumental; the service
             default applies when None.
+        lyrics: Official lyrics, one verse per line, if known.
     """
 
     model_config = ConfigDict(str_strip_whitespace=True, frozen=True)
@@ -55,6 +57,7 @@ class NewSong(BaseModel):
     artist: str = Field(min_length=1, max_length=200)
     language: str | None = Field(default=None, pattern=r"^[a-z]{2}$")
     separation_preset: SeparationPreset | None = None
+    lyrics: str | None = Field(default=None, max_length=MAX_LYRICS_CHARS)
 
 
 class SongRegistration(BaseModel):
@@ -172,6 +175,8 @@ class SongIngestionService:
                 song.separation_preset or self._default_preset,
             )
             song_id = record.id
+            if song.lyrics:
+                await self._songs.set_lyrics(record.id, song.lyrics)
             stored = await self._storage.save(
                 asset_key(record.id, AssetKind.ORIGINAL, extension),
                 self._limit_size(content),
