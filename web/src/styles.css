@@ -62,7 +62,8 @@ button:disabled {
   cursor: not-allowed;
 }
 
-input {
+input,
+select {
   font: inherit;
   color: var(--text);
   background: var(--surface);

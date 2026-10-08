@@ -10,6 +10,12 @@ import { SongProgress } from "../components/SongProgress";
 import { useAsync } from "../hooks/useAsync";
 import { useKaraoke } from "../session/useKaraoke";
 import { usePlaySession } from "../session/usePlaySession";
+import {
+  DIFFICULTIES,
+  loadDifficulty,
+  saveDifficulty,
+  type Difficulty,
+} from "../settings/difficulty";
 import { loadLatency } from "../settings/latency";
 import {
   MAX_PLAYER_NAME,
@@ -42,6 +48,7 @@ export function SongPage() {
 
 function Karaoke({ song }: { song: SongDetail }) {
   const [playerName, setPlayerName] = useState(loadPlayerName);
+  const [difficulty, setDifficulty] = useState(loadDifficulty);
   const latencyMs = loadLatency();
   const session = usePlaySession(song);
   const karaoke = useKaraoke(song, session.sendLine, () => void session.finish());
@@ -57,7 +64,7 @@ function Karaoke({ song }: { song: SongDetail }) {
     const name = normalizePlayerName(playerName);
     savePlayerName(name);
     setPlayerName(name);
-    if (!(await session.start(name, latencyMs ?? 0))) return;
+    if (!(await session.start(name, latencyMs ?? 0, difficulty))) return;
     if (!(await karaoke.play())) session.close();
   };
 
@@ -102,6 +109,23 @@ function Karaoke({ song }: { song: SongDetail }) {
                 setPlayerName(event.target.value);
               }}
             />
+          </label>
+          <label>
+            Dificultad{" "}
+            <select
+              value={difficulty}
+              onChange={(event) => {
+                const level = event.target.value as Difficulty;
+                setDifficulty(level);
+                saveDifficulty(level);
+              }}
+            >
+              {DIFFICULTIES.map((level) => (
+                <option key={level.value} value={level.value}>
+                  {level.label} ({level.hint})
+                </option>
+              ))}
+            </select>
           </label>
           <p className="muted">
             {latencyMs === null ? (

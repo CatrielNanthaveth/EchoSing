@@ -61,7 +61,12 @@ describe("ApiClient", () => {
     const { client, fetchMock } = clientReturning(
       jsonResponse({ session_id: "s" }, 201),
     );
-    const body = { song_id: "song", player_name: "Ana", latency_offset_ms: 120 };
+    const body = {
+      song_id: "song",
+      player_name: "Ana",
+      latency_offset_ms: 120,
+      difficulty: "easy" as const,
+    };
 
     await client.createSession(body);
 

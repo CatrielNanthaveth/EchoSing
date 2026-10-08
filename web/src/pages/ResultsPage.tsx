@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router";
 import { ApiError, api } from "../api/client";
 import type { LineReport, SessionResults } from "../api/types";
 import { useAsync } from "../hooks/useAsync";
+import { difficultyLabel } from "../settings/difficulty";
 import { NotFoundPage } from "./NotFoundPage";
 
 interface Loaded {
@@ -48,7 +49,7 @@ export function ResultsPage() {
     <section className="results">
       <header>
         <p className="muted">
-          {results.player_name}
+          {results.player_name} · {difficultyLabel(results.difficulty)}
           {results.status === "active" && " · sesión sin terminar"}
         </p>
         <h1>{title ?? "Resultados"}</h1>

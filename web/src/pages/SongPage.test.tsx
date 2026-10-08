@@ -41,6 +41,7 @@ const CREATED: SessionCreated = {
   line_count: 3,
   player_name: "Ana",
   latency_offset_ms: 120,
+  difficulty: "normal",
 };
 
 let sources: FakeSource[] = [];
@@ -140,6 +141,11 @@ describe("SongPage", () => {
     const name = screen.getByRole("textbox", { name: "Tu nombre" });
     await user.clear(name);
     await user.type(name, " Ana ");
+    expect(screen.getByRole("combobox", { name: "Dificultad" })).toHaveValue("normal");
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Dificultad" }),
+      "easy",
+    );
     await user.click(screen.getByRole("button", { name: "Cantar" }));
 
     await screen.findByRole("button", { name: "Detener" });
@@ -147,7 +153,9 @@ describe("SongPage", () => {
       song_id: "song-1",
       player_name: "Ana",
       latency_offset_ms: 120,
+      difficulty: "easy",
     });
+    expect(localStorage.getItem("echosing.difficulty")).toBe("easy");
     expect(FakeSocket.instances[0]?.url).toBe(
       "ws://localhost:8000/ws/sessions/session-1",
     );

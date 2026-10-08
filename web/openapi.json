@@ -650,6 +650,16 @@
         ],
         "title": "Body_upload_song_admin_songs_post"
       },
+      "Difficulty": {
+        "type": "string",
+        "enum": [
+          "easy",
+          "normal",
+          "hard"
+        ],
+        "title": "Difficulty",
+        "description": "How far from the note singing still earns credit.\n\nAttributes:\n    EASY: Full credit within 1 semitone, none from 3.\n    NORMAL: Full credit within 3/4 of a semitone, none from 2.5.\n    HARD: Full credit within half a semitone, none from 2."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1023,6 +1033,10 @@
             "minimum": -500.0,
             "title": "Latency Offset Ms",
             "default": 0
+          },
+          "difficulty": {
+            "$ref": "#/components/schemas/Difficulty",
+            "default": "normal"
           }
         },
         "type": "object",
@@ -1031,7 +1045,7 @@
           "player_name"
         ],
         "title": "SessionCreate",
-        "description": "Request to start singing a song.\n\nAttributes:\n    song_id: Song to sing (must be playable).\n    player_name: Display name of the anonymous player.\n    latency_offset_ms: Audio latency measured by the client's calibration;\n        positive when the voice arrives late."
+        "description": "Request to start singing a song.\n\nAttributes:\n    song_id: Song to sing (must be playable).\n    player_name: Display name of the anonymous player.\n    latency_offset_ms: Audio latency measured by the client's calibration;\n        positive when the voice arrives late.\n    difficulty: Pitch tolerance of the scoring."
       },
       "SessionCreated": {
         "properties": {
@@ -1065,6 +1079,9 @@
           "latency_offset_ms": {
             "type": "integer",
             "title": "Latency Offset Ms"
+          },
+          "difficulty": {
+            "$ref": "#/components/schemas/Difficulty"
           }
         },
         "type": "object",
@@ -1075,10 +1092,11 @@
           "analysis_version",
           "line_count",
           "player_name",
-          "latency_offset_ms"
+          "latency_offset_ms",
+          "difficulty"
         ],
         "title": "SessionCreated",
-        "description": "A started play session.\n\nAttributes:\n    session_id: Id of the session (used by the WebSocket).\n    song_id: Song being sung.\n    analysis_id: Analysis version the session is scored against.\n    analysis_version: Version number of that analysis.\n    line_count: Number of lyric lines to sing.\n    player_name: Display name of the player.\n    latency_offset_ms: Latency applied when scoring."
+        "description": "A started play session.\n\nAttributes:\n    session_id: Id of the session (used by the WebSocket).\n    song_id: Song being sung.\n    analysis_id: Analysis version the session is scored against.\n    analysis_version: Version number of that analysis.\n    line_count: Number of lyric lines to sing.\n    player_name: Display name of the player.\n    latency_offset_ms: Latency applied when scoring.\n    difficulty: Pitch tolerance of the scoring."
       },
       "SessionResults": {
         "properties": {
@@ -1100,6 +1118,9 @@
           "player_name": {
             "type": "string",
             "title": "Player Name"
+          },
+          "difficulty": {
+            "$ref": "#/components/schemas/Difficulty"
           },
           "status": {
             "$ref": "#/components/schemas/PlaySessionStatus"
@@ -1138,6 +1159,7 @@
           "song_id",
           "analysis_id",
           "player_name",
+          "difficulty",
           "status",
           "started_at",
           "finished_at",
@@ -1145,7 +1167,7 @@
           "lines"
         ],
         "title": "SessionResults",
-        "description": "Report of a play session.\n\nAttributes:\n    session_id: Session id.\n    song_id: Song sung.\n    analysis_id: Analysis the session was scored against.\n    player_name: Display name of the player.\n    status: ``active`` or ``finished``.\n    started_at: When the session started.\n    finished_at: When it finished, if it did.\n    totals: Totals over the lines scored so far (all lines once finished).\n    lines: One entry per lyric line, in order."
+        "description": "Report of a play session.\n\nAttributes:\n    session_id: Session id.\n    song_id: Song sung.\n    analysis_id: Analysis the session was scored against.\n    player_name: Display name of the player.\n    difficulty: Pitch tolerance the session is scored with.\n    status: ``active`` or ``finished``.\n    started_at: When the session started.\n    finished_at: When it finished, if it did.\n    totals: Totals over the lines scored so far (all lines once finished).\n    lines: One entry per lyric line, in order."
       },
       "SessionTotals": {
         "properties": {

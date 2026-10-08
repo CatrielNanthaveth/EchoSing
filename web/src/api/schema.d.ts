@@ -230,6 +230,17 @@ export interface components {
             /** Lyrics */
             lyrics?: string | null;
         };
+        /**
+         * Difficulty
+         * @description How far from the note singing still earns credit.
+         *
+         *     Attributes:
+         *         EASY: Full credit within 1 semitone, none from 3.
+         *         NORMAL: Full credit within 3/4 of a semitone, none from 2.5.
+         *         HARD: Full credit within half a semitone, none from 2.
+         * @enum {string}
+         */
+        Difficulty: "easy" | "normal" | "hard";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -430,6 +441,7 @@ export interface components {
          *         player_name: Display name of the anonymous player.
          *         latency_offset_ms: Audio latency measured by the client's calibration;
          *             positive when the voice arrives late.
+         *         difficulty: Pitch tolerance of the scoring.
          */
         SessionCreate: {
             /**
@@ -444,6 +456,8 @@ export interface components {
              * @default 0
              */
             latency_offset_ms: number;
+            /** @default normal */
+            difficulty: components["schemas"]["Difficulty"];
         };
         /**
          * SessionCreated
@@ -457,6 +471,7 @@ export interface components {
          *         line_count: Number of lyric lines to sing.
          *         player_name: Display name of the player.
          *         latency_offset_ms: Latency applied when scoring.
+         *         difficulty: Pitch tolerance of the scoring.
          */
         SessionCreated: {
             /**
@@ -482,6 +497,7 @@ export interface components {
             player_name: string;
             /** Latency Offset Ms */
             latency_offset_ms: number;
+            difficulty: components["schemas"]["Difficulty"];
         };
         /**
          * SessionResults
@@ -492,6 +508,7 @@ export interface components {
          *         song_id: Song sung.
          *         analysis_id: Analysis the session was scored against.
          *         player_name: Display name of the player.
+         *         difficulty: Pitch tolerance the session is scored with.
          *         status: ``active`` or ``finished``.
          *         started_at: When the session started.
          *         finished_at: When it finished, if it did.
@@ -516,6 +533,7 @@ export interface components {
             analysis_id: string;
             /** Player Name */
             player_name: string;
+            difficulty: components["schemas"]["Difficulty"];
             status: components["schemas"]["PlaySessionStatus"];
             /**
              * Started At
