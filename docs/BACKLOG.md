@@ -197,6 +197,10 @@ Una canción es *jugable* si tiene análisis actual e instrumental, sin importar
 
 ## Mejoras pendientes (detectadas en la prueba M4)
 
+- [x] **Alineación de letras oficiales:** alineación óptima (los estribillos repetidos
+  rompían `difflib`) y palabras casi iguales (`feli'`/`feliz`). "Rara vez": 34% → 85%.
+- [x] **Niveles de dificultad:** Fácil / Normal (por defecto) / Difícil; solo cambia la
+  tolerancia de afinación. 1 semitono desafinado: 100 / ~86 / ~67.
 - [ ] **Palabras sostenidas:** Whisper corta las palabras largas antes de tiempo;
   extender el final de la última palabra de cada verso mientras la voz de referencia
   (CREPE) sigue sonando, sin pisar el verso siguiente. Afecta al resaltado de la letra
