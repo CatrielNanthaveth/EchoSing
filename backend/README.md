@@ -216,6 +216,7 @@ provides timings.
 uv run python -m app.cli add-song song.mp3 --title "T" --artist "A" --lyrics song.txt
 uv run python -m app.cli set-lyrics <song_id> song.txt       # add or fix them later
 uv run python -m app.cli run-stage segment <song_id>         # rebuild the lines
+uv run python -m app.cli run-stage persist <song_id>         # publish them
 ```
 
 Or via the API: `lyrics` form field on `POST /admin/songs`, or
