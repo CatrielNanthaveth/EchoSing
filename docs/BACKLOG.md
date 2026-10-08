@@ -192,7 +192,8 @@ Una canción es *jugable* si tiene análisis actual e instrumental, sin importar
 - [x] **US-6.6** Sesión con nombre y latencia calibrada; WebSocket con cola ordenada y
   reconexión (reenvía solo lo no puntuado); puntaje, veredicto y racha por verso; `finish`
   al terminar la canción con el resultado final.
-- [ ] **US-6.7** Pantalla de resultados.
+- [x] **US-6.7** Resultados (`/sessions/{id}/results`): puntaje, afinación, aciertos,
+  mejor racha y cada verso (cantado, no cantado o no puntuable).
 
 ## E7 — Modo práctica
 
