@@ -523,9 +523,6 @@ a.button.primary {
 }
 
 .results-line {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
   padding: 0.5rem 0.9rem;
   border-radius: var(--radius);
   background: var(--surface);
@@ -557,4 +554,89 @@ a.button.primary {
 .results-line.unsung,
 .results-line.neutral {
   color: var(--muted);
+}
+
+.results-line-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.results-line-text {
+  flex: 1;
+}
+
+.results-line-toggle {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.results-line-practice {
+  margin-top: 0.75rem;
+}
+
+/* Practice */
+
+.practice-advice {
+  margin: 0 0 0.5rem;
+  padding-left: 1.2rem;
+}
+
+.practice-toggle {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.pitch-chart {
+  margin: 0;
+  color: var(--text);
+}
+
+.chart-tooltip {
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.chart-tooltip p {
+  margin: 0.1rem 0;
+}
+
+.chart-tooltip-title {
+  color: var(--muted);
+}
+
+.chart-swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 2px;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+}
+
+.practice-table table {
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.practice-table th,
+.practice-table td {
+  padding: 0.25rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.practice-table thead th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.chart-legend-label {
+  color: var(--text);
 }

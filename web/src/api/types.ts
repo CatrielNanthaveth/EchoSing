@@ -15,6 +15,9 @@ export type SessionCreated = Schemas["SessionCreated"];
 export type SessionResults = Schemas["SessionResults"];
 export type SessionTotals = Schemas["SessionTotals"];
 export type LineReport = Schemas["LineReport"];
+export type LinePractice = Schemas["LinePractice"];
+export type LineAnalysis = Schemas["LineAnalysis"];
+export type PracticeWord = Schemas["PracticeWord"];
 
 // Real-time protocol (docs/ws-protocol.md).
 export type LinePitchMessage = Schemas["LinePitchMessage"];

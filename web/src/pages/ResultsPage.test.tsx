@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ApiError, api } from "../api/client";
 import type { LineReport, SessionResults } from "../api/types";
-import { songDetail } from "../test/factories";
+import { linePractice, songDetail } from "../test/factories";
 import { ResultsPage } from "./ResultsPage";
 
 function report(overrides: Partial<LineReport> & { line_index: number }): LineReport {
@@ -93,17 +93,54 @@ describe("ResultsPage", () => {
     renderResults();
 
     const items = within(await screen.findByRole("list")).getAllByRole("listitem");
-    expect(items.map((item) => item.textContent)).toEqual([
-      "Verso 191",
-      "Verso 285",
-      "Verso 332",
-      "Verso 4no cantado",
-      "Verso 5no puntúa",
+    expect(
+      items.map((item) =>
+        Array.from(item.querySelectorAll(".results-line-text, .results-line-score"))
+          .map((cell) => cell.textContent)
+          .join(" "),
+      ),
+    ).toEqual([
+      "Verso 1 91",
+      "Verso 2 85",
+      "Verso 3 32",
+      "Verso 4 no cantado",
+      "Verso 5 no puntúa",
     ]);
     expect(items[0]).toHaveClass("hit");
     expect(items[2]).toHaveClass("miss");
     expect(items[3]).toHaveClass("unsung");
     expect(items[4]).toHaveClass("neutral");
+  });
+
+  it("opens how each sung line was sung", async () => {
+    vi.spyOn(api, "getSessionResults").mockResolvedValue(results());
+    vi.spyOn(api, "getSong").mockResolvedValue(songDetail());
+    const getLineAnalysis = vi
+      .spyOn(api, "getLineAnalysis")
+      .mockResolvedValue(linePractice({ line_index: 2 }));
+    const user = userEvent.setup();
+    renderResults();
+
+    const items = within(await screen.findByRole("list")).getAllByRole("listitem");
+    const [, , third, fourth] = items;
+    if (third === undefined || fourth === undefined) throw new Error("Missing lines");
+    // Only sung lines can be opened.
+    expect(within(fourth).queryByRole("button")).toBeNull();
+    const toggle = within(third).getByRole("button", {
+      name: "Ver cómo cantaste",
+    });
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(await screen.findByText("Entraste a tiempo.")).toBeVisible();
+    expect(getLineAnalysis).toHaveBeenCalledWith(
+      "session-1",
+      2,
+      expect.any(AbortSignal),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Ocultar" }));
+    expect(screen.queryByText("Entraste a tiempo.")).toBeNull();
   });
 
   it("marks unfinished sessions, without results for unsung lines", async () => {

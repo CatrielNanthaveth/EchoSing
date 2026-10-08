@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { ApiError, api } from "../api/client";
 import type { LineReport, SessionResults } from "../api/types";
+import { LinePracticePanel } from "../components/LinePracticePanel";
 import { useAsync } from "../hooks/useAsync";
 import { difficultyLabel } from "../settings/difficulty";
 import { NotFoundPage } from "./NotFoundPage";
@@ -91,14 +93,15 @@ export function ResultsPage() {
       <h2>Verso por verso</h2>
       <ol className="results-lines">
         {results.lines.map((line) => (
-          <LineRow key={line.line_index} line={line} />
+          <LineRow key={line.line_index} line={line} sessionId={results.session_id} />
         ))}
       </ol>
     </section>
   );
 }
 
-function LineRow({ line }: { line: LineReport }) {
+function LineRow({ line, sessionId }: { line: LineReport; sessionId: string }) {
+  const [open, setOpen] = useState(false);
   let label: string;
   let tone: string;
   if (line.scorable === false) {
@@ -111,10 +114,31 @@ function LineRow({ line }: { line: LineReport }) {
     label = line.score === null ? "–" : String(Math.round(line.score));
     tone = line.hit ? "hit" : "miss";
   }
+  const panelId = `practice-${String(line.line_index)}`;
   return (
     <li className={`results-line ${tone}`}>
-      <span className="results-line-text">{line.text}</span>
-      <span className="results-line-score">{label}</span>
+      <div className="results-line-row">
+        <span className="results-line-text">{line.text}</span>
+        <span className="results-line-score">{label}</span>
+        {line.sung && (
+          <button
+            type="button"
+            className="results-line-toggle"
+            aria-expanded={open}
+            aria-controls={panelId}
+            onClick={() => {
+              setOpen((value) => !value);
+            }}
+          >
+            {open ? "Ocultar" : "Ver cómo cantaste"}
+          </button>
+        )}
+      </div>
+      {open && (
+        <div id={panelId} className="results-line-practice">
+          <LinePracticePanel sessionId={sessionId} lineIndex={line.line_index} />
+        </div>
+      )}
     </li>
   );
 }

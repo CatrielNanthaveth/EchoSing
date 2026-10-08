@@ -5,11 +5,17 @@ export function hzToMidi(hz: number): number {
   return 69 + 12 * Math.log2(hz / 440);
 }
 
+/** Name of the nearest note of a MIDI number, e.g. 69.2 -> "A4". */
+export function midiNoteName(midi: number): string {
+  const nearest = Math.round(midi);
+  const pitchClass = ((nearest % 12) + 12) % 12;
+  return `${NOTE_NAMES[pitchClass] ?? "?"}${Math.floor(nearest / 12) - 1}`;
+}
+
 /** Nearest note name, e.g. 440 -> "A4"; null when unvoiced. */
 export function noteName(hz: number): string | null {
   if (!(hz > 0)) return null;
-  const midi = Math.round(hzToMidi(hz));
-  return `${NOTE_NAMES[midi % 12] ?? "?"}${Math.floor(midi / 12) - 1}`;
+  return midiNoteName(hzToMidi(hz));
 }
 
 /** RMS level as 0-1 on a -60..0 dBFS scale, for meters. */

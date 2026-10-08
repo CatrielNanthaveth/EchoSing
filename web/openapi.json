@@ -376,6 +376,62 @@
         }
       }
     },
+    "/sessions/{session_id}/lines/{line_index}/analysis": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Get Line Analysis",
+        "description": "How one line was sung: reference vs sung curves, offsets and score.",
+        "operationId": "get_line_analysis_sessions__session_id__lines__line_index__analysis_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "line_index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Line Index"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinePractice"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session or line not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/songs": {
       "post": {
         "tags": [
@@ -576,6 +632,81 @@
           },
           "404": {
             "description": "Song not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/sessions/{session_id}/lines/{line_index}/debug": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Line Diagnostics",
+        "description": "Everything behind a line score: raw inputs, parameters and word timing.",
+        "operationId": "get_line_diagnostics_admin_sessions__session_id__lines__line_index__debug_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "line_index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Line Index"
+            }
+          },
+          {
+            "name": "x-admin-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LineDiagnostics"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Session or line not found"
           },
           "422": {
             "description": "Validation Error",
@@ -793,6 +924,316 @@
         "title": "JobReport",
         "description": "State of an ingestion job.\n\nAttributes:\n    id: Job id.\n    stage: Current or final stage.\n    task_id: Id of the queued task, if it was queued.\n    error_message: Failure reason, if it failed.\n    created_at: When the job was created.\n    started_at: When processing started.\n    finished_at: When it finished, successfully or not."
       },
+      "LineAnalysis": {
+        "properties": {
+          "result": {
+            "$ref": "#/components/schemas/LineResult"
+          },
+          "hop_ms": {
+            "type": "number",
+            "title": "Hop Ms"
+          },
+          "reference_midi": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Reference Midi"
+          },
+          "reference_weight": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Reference Weight"
+          },
+          "sung_midi": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Sung Midi"
+          },
+          "aligned_midi": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Aligned Midi"
+          },
+          "credit": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Credit"
+          },
+          "alignment_path": {
+            "items": {
+              "prefixItems": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "type": "array",
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "type": "array",
+            "title": "Alignment Path"
+          },
+          "octave_shift": {
+            "type": "integer",
+            "title": "Octave Shift"
+          },
+          "timing_offset_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timing Offset Ms"
+          },
+          "pitch_offset_semitones": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pitch Offset Semitones"
+          }
+        },
+        "type": "object",
+        "required": [
+          "result",
+          "hop_ms",
+          "reference_midi",
+          "reference_weight",
+          "sung_midi",
+          "aligned_midi",
+          "credit",
+          "alignment_path",
+          "octave_shift",
+          "timing_offset_ms",
+          "pitch_offset_semitones"
+        ],
+        "title": "LineAnalysis",
+        "description": "A sung line explained frame by frame, on the scoring timeline.\n\nEvery list has one value per scoring frame from the line start; None marks\nframes without voice (or without a value).\n\nAttributes:\n    result: The line score, identical to ``score_line``.\n    hop_ms: Time between frames.\n    reference_midi: Reference pitch.\n    reference_weight: Confidence weight of each reference frame (0-1).\n    sung_midi: What was sung at each moment (latency undone), shifted by\n        whole octaves to the reference's register (``octave_shift``).\n    aligned_midi: For each sung reference frame, the sung pitch DTW\n        matched to it, in the reference's octave: what was scored.\n    credit: Credit (0-1) of each sung reference frame.\n    alignment_path: Pairs ``[reference_frame, sung_frame]`` of the\n        alignment path.\n    octave_shift: Whole octaves (in semitones) removed from ``sung_midi``,\n        e.g. -12 when the line was sung an octave lower.\n    timing_offset_ms: Median delay of the matched sung frames (positive:\n        sung late), None if nothing was matched.\n    pitch_offset_semitones: Median pitch error with sign (positive: sharp),\n        None if nothing was matched."
+      },
+      "LineDiagnostics": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "line_index": {
+            "type": "integer",
+            "title": "Line Index"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "start_ms": {
+            "type": "integer",
+            "title": "Start Ms"
+          },
+          "end_ms": {
+            "type": "integer",
+            "title": "End Ms"
+          },
+          "difficulty": {
+            "$ref": "#/components/schemas/Difficulty"
+          },
+          "words": {
+            "items": {
+              "$ref": "#/components/schemas/PracticeWord"
+            },
+            "type": "array",
+            "title": "Words"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "analyzed",
+              "not_sung",
+              "not_stored"
+            ],
+            "title": "Status"
+          },
+          "analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LineAnalysis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latency_ms": {
+            "type": "integer",
+            "title": "Latency Ms"
+          },
+          "scoring": {
+            "$ref": "#/components/schemas/ScoringConfig"
+          },
+          "analysis_version": {
+            "type": "integer",
+            "title": "Analysis Version"
+          },
+          "pipeline": {
+            "$ref": "#/components/schemas/PipelineInfo"
+          },
+          "reference": {
+            "$ref": "#/components/schemas/PitchCurve"
+          },
+          "sung_input": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SungPitch"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "word_timing": {
+            "items": {
+              "$ref": "#/components/schemas/WordDiagnostics"
+            },
+            "type": "array",
+            "title": "Word Timing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "line_index",
+          "text",
+          "start_ms",
+          "end_ms",
+          "difficulty",
+          "words",
+          "status",
+          "analysis",
+          "latency_ms",
+          "scoring",
+          "analysis_version",
+          "pipeline",
+          "reference",
+          "sung_input",
+          "word_timing"
+        ],
+        "title": "LineDiagnostics",
+        "description": "Everything behind a line score, for admins debugging sync and scoring.\n\nAttributes:\n    latency_ms: Latency compensated for the session.\n    scoring: Exact scoring parameters used (difficulty included).\n    analysis_version: Version of the song analysis the session uses.\n    pipeline: Models that produced that analysis.\n    reference: Reference pitch of the line at its native resolution\n        (frame 0 at ``start_ms``).\n    sung_input: Pitch exactly as the client sent it, None if not stored.\n    word_timing: Words with their voicing and transcriber confidence."
+      },
+      "LinePractice": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "line_index": {
+            "type": "integer",
+            "title": "Line Index"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "start_ms": {
+            "type": "integer",
+            "title": "Start Ms"
+          },
+          "end_ms": {
+            "type": "integer",
+            "title": "End Ms"
+          },
+          "difficulty": {
+            "$ref": "#/components/schemas/Difficulty"
+          },
+          "words": {
+            "items": {
+              "$ref": "#/components/schemas/PracticeWord"
+            },
+            "type": "array",
+            "title": "Words"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "analyzed",
+              "not_sung",
+              "not_stored"
+            ],
+            "title": "Status"
+          },
+          "analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LineAnalysis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "line_index",
+          "text",
+          "start_ms",
+          "end_ms",
+          "difficulty",
+          "words",
+          "status",
+          "analysis"
+        ],
+        "title": "LinePractice",
+        "description": "How the player sang one line, for the practice chart.\n\nAttributes:\n    session_id: Session.\n    line_index: Line.\n    text: Line text.\n    start_ms: Line start in the song.\n    end_ms: Line end in the song.\n    difficulty: Pitch tolerance the line was scored with.\n    words: Words of the line.\n    status: Whether there is an analysis (see ``AnalysisStatus``).\n    analysis: Curves, alignment and offsets; None unless ``analyzed``."
+      },
       "LineReport": {
         "properties": {
           "line_index": {
@@ -857,6 +1298,54 @@
         ],
         "title": "LineReport",
         "description": "Result of one lyric line in a session report.\n\nAttributes:\n    line_index: Line index.\n    text: Line text.\n    sung: Whether the player sang it (unsung lines score 0 at finish).\n    scorable: Whether the line has enough singing to be judged.\n    score: 0-100, None if not sung yet or not scorable.\n    accuracy: 0-1, None if not sung yet or not scorable.\n    hit: Whether the line was a hit."
+      },
+      "LineResult": {
+        "properties": {
+          "scorable": {
+            "type": "boolean",
+            "title": "Scorable"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy"
+          },
+          "hit": {
+            "type": "boolean",
+            "title": "Hit"
+          },
+          "voiced_frames": {
+            "type": "integer",
+            "title": "Voiced Frames"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scorable",
+          "score",
+          "accuracy",
+          "hit",
+          "voiced_frames"
+        ],
+        "title": "LineResult",
+        "description": "Score of one sung line.\n\nAttributes:\n    scorable: False when the reference has too little singing to judge.\n    score: Weighted pitch score in [0, 100], None if not scorable.\n    accuracy: Fraction of reference frames sung within full credit, in\n        [0, 1], None if not scorable.\n    hit: Whether the score reaches the hit threshold.\n    voiced_frames: Sung reference frames, used to weight session totals."
       },
       "LyricLine": {
         "properties": {
@@ -936,6 +1425,81 @@
         "title": "LyricsUpdate",
         "description": "Official lyrics submitted for a song.\n\nAttributes:\n    lyrics: Plain text, one verse per line. Empty lines, ``[Section]``\n        labels and lines fully in parentheses are ignored."
       },
+      "PipelineInfo": {
+        "properties": {
+          "separator": {
+            "type": "string",
+            "title": "Separator"
+          },
+          "transcriber": {
+            "type": "string",
+            "title": "Transcriber"
+          },
+          "pitch_extractor": {
+            "type": "string",
+            "title": "Pitch Extractor"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "separator",
+          "transcriber",
+          "pitch_extractor"
+        ],
+        "title": "PipelineInfo",
+        "description": "Models and parameters that produced the analysis, for reproducibility.\n\nAttributes:\n    separator: Source separation model (e.g. ``htdemucs``).\n    transcriber: Speech recognition model (e.g. ``whisper-large-v3-turbo``).\n    pitch_extractor: Pitch model (e.g. ``torchcrepe-full``).\n    language: Language detected or forced during transcription."
+      },
+      "PitchCurve": {
+        "properties": {
+          "hop_ms": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Hop Ms"
+          },
+          "midi": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Midi"
+          },
+          "confidence": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Confidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "hop_ms",
+          "midi",
+          "confidence"
+        ],
+        "title": "PitchCurve",
+        "description": "Pitch track sampled every ``hop_ms``; frame ``i`` is centered at ``i * hop_ms``.\n\nEvery frame keeps its pitch estimate and confidence, so the voicing decision\n(which frames count as singing) is made when reading, not when storing.\n\nAttributes:\n    hop_ms: Time between consecutive frames.\n    midi: Pitch per frame as fractional MIDI note number (69.0 = A4 =\n        440 Hz), rounded to 0.01 (1 cent); None when there is no estimate.\n    confidence: Voicing confidence per frame, as an integer in [0, 100]."
+      },
       "PitchResponse": {
         "properties": {
           "analysis_id": {
@@ -1004,6 +1568,105 @@
         ],
         "title": "PlaySessionStatus",
         "description": "Lifecycle of a karaoke play session."
+      },
+      "PracticeWord": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "start_ms": {
+            "type": "integer",
+            "title": "Start Ms"
+          },
+          "end_ms": {
+            "type": "integer",
+            "title": "End Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "start_ms",
+          "end_ms"
+        ],
+        "title": "PracticeWord",
+        "description": "A lyric word, timed from the line start.\n\nAttributes:\n    text: Word as displayed.\n    start_ms: Start, relative to the line start.\n    end_ms: End, relative to the line start."
+      },
+      "ScoringConfig": {
+        "properties": {
+          "scoring_hop_ms": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Scoring Hop Ms",
+            "default": 20.0
+          },
+          "min_reference_confidence": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Min Reference Confidence",
+            "default": 50
+          },
+          "min_voiced_ms": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Min Voiced Ms",
+            "default": 200.0
+          },
+          "full_credit_semitones": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Full Credit Semitones",
+            "default": 0.5
+          },
+          "zero_credit_semitones": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Zero Credit Semitones",
+            "default": 2.0
+          },
+          "max_error_semitones": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Max Error Semitones",
+            "default": 6.0
+          },
+          "octave_invariant": {
+            "type": "boolean",
+            "title": "Octave Invariant",
+            "default": true
+          },
+          "max_warp_ms": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Warp Ms",
+            "default": 200.0
+          },
+          "step_penalty_semitones": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Step Penalty Semitones",
+            "default": 2.0
+          },
+          "hit_threshold": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Hit Threshold",
+            "default": 60.0
+          }
+        },
+        "type": "object",
+        "title": "ScoringConfig",
+        "description": "Tunable parameters of line scoring.\n\nAttributes:\n    scoring_hop_ms: Frame period used to compare curves. Notes last at\n        least ~100 ms, so 20 ms loses nothing for intonation and keeps DTW\n        fast enough for real-time feedback.\n    min_reference_confidence: Reference frames below this confidence\n        (0-100) are not sung and not scored.\n    min_voiced_ms: Lines with less sung reference than this (e.g. spoken\n        passages) are not scorable.\n    full_credit_semitones: Errors up to this get full credit (0.5 = 50\n        cents, a quarter tone).\n    zero_credit_semitones: Errors from this up get no credit; credit\n        decreases linearly in between.\n    max_error_semitones: Cap of the frame error; also the cost of a sung\n        frame without voice.\n    octave_invariant: Whether singing an octave above or below is right.\n    max_warp_ms: How far (in time) the alignment may drift from the\n        diagonal: enough to enter late or hold a note, not enough to match\n        a neighboring note (None for no limit).\n    step_penalty_semitones: Cost of each non-diagonal alignment step. It\n        stops DTW from \"rewarding\" off-key singing by matching it to other\n        reference notes of the same height (without it, singing 1.5\n        semitones off scores 58 instead of 33). 2.0 gives the theoretical\n        scores for detuned singing while keeping late entries (150 ms ->\n        100) and rhythm variations (+-100 ms -> ~97) almost unpenalized.\n    hit_threshold: Line score from which the line counts as a hit."
       },
       "SeparationPreset": {
         "type": "string",
@@ -1515,6 +2178,28 @@
         "title": "SongSummary",
         "description": "A playable song as listed in the catalog.\n\nAttributes:\n    id: Song id.\n    title: Song title.\n    artist: Performing artist.\n    language: ISO 639-1 code of the lyrics, if known.\n    duration_ms: Duration of the song.\n    line_count: Number of lyric lines (scoring units).\n    reprocessing: True while a newer analysis is being produced; the song\n        stays playable with its current one."
       },
+      "SungPitch": {
+        "properties": {
+          "hop_ms": {
+            "type": "number",
+            "title": "Hop Ms"
+          },
+          "f0_hz": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "F0 Hz"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hop_ms",
+          "f0_hz"
+        ],
+        "title": "SungPitch",
+        "description": "Pitch the player sang over one line, as stored for later analysis.\n\nAttributes:\n    hop_ms: Time between frames.\n    f0_hz: Pitch per frame from the line start, 0 where unvoiced."
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -1594,6 +2279,47 @@
         ],
         "title": "Word",
         "description": "A transcribed word with its timing.\n\nAttributes:\n    text: The word as transcribed, including attached punctuation.\n    start_ms: Start time from the beginning of the song.\n    end_ms: End time (exclusive); greater than ``start_ms``.\n    probability: Transcriber confidence in [0, 1], if available."
+      },
+      "WordDiagnostics": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "start_ms": {
+            "type": "integer",
+            "title": "Start Ms"
+          },
+          "end_ms": {
+            "type": "integer",
+            "title": "End Ms"
+          },
+          "voiced_ratio": {
+            "type": "number",
+            "title": "Voiced Ratio"
+          },
+          "probability": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probability"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "start_ms",
+          "end_ms",
+          "voiced_ratio",
+          "probability"
+        ],
+        "title": "WordDiagnostics",
+        "description": "A word with what is known about its timing.\n\nAttributes:\n    voiced_ratio: Fraction of the word's span where the reference vocals\n        have voice. Low values on sung words point to lyrics out of sync.\n    probability: Transcriber confidence, None for official lyrics words\n        without a transcribed match."
       },
       "ErrorCode": {
         "description": "Machine-readable error codes sent over the WebSocket.",

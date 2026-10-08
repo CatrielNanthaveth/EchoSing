@@ -1,4 +1,11 @@
-import type { LyricLine, SongDetail, SongPage, SongSummary } from "../api/types";
+import type {
+  LineAnalysis,
+  LinePractice,
+  LyricLine,
+  SongDetail,
+  SongPage,
+  SongSummary,
+} from "../api/types";
 
 export function songSummary(overrides: Partial<SongSummary> = {}): SongSummary {
   return {
@@ -59,6 +66,43 @@ export function songDetail(overrides: Partial<SongDetail> = {}): SongDetail {
     analysis_id: "analysis-1",
     analysis_version: 1,
     lines,
+    ...overrides,
+  };
+}
+
+/** A perfectly sung 0.2 s line: reference A3 then B3, 20 ms frames. */
+export function lineAnalysis(overrides: Partial<LineAnalysis> = {}): LineAnalysis {
+  const reference = [57, 57, 57, 57, 57, 59, 59, 59, 59, null];
+  return {
+    result: { scorable: true, score: 100, accuracy: 1, hit: true, voiced_frames: 9 },
+    hop_ms: 20,
+    reference_midi: reference,
+    reference_weight: reference.map(() => 0.95),
+    sung_midi: reference,
+    aligned_midi: reference,
+    credit: reference.map((value) => (value === null ? null : 1)),
+    alignment_path: reference.map((_, i) => [i, i]),
+    octave_shift: 0,
+    timing_offset_ms: 0,
+    pitch_offset_semitones: 0,
+    ...overrides,
+  };
+}
+
+export function linePractice(overrides: Partial<LinePractice> = {}): LinePractice {
+  return {
+    session_id: "session-1",
+    line_index: 0,
+    text: "Hola mundo",
+    start_ms: 5000,
+    end_ms: 5200,
+    difficulty: "normal",
+    words: [
+      { text: "Hola", start_ms: 0, end_ms: 100 },
+      { text: "mundo", start_ms: 100, end_ms: 200 },
+    ],
+    status: "analyzed",
+    analysis: lineAnalysis(),
     ...overrides,
   };
 }

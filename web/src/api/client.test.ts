@@ -49,11 +49,13 @@ describe("ApiClient", () => {
     await client.getSong("a b");
     await client.getPitch("s1");
     await client.getSessionResults("x1");
+    await client.getLineAnalysis("x1", 3);
 
     expect(requestedUrls(fetchMock)).toEqual([
       "http://api.test/songs/a%20b",
       "http://api.test/songs/s1/pitch",
       "http://api.test/sessions/x1/results",
+      "http://api.test/sessions/x1/lines/3/analysis",
     ]);
   });
 

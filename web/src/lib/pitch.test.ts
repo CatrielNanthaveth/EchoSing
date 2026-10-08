@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hzToMidi, levelFraction, noteName } from "./pitch";
+import { hzToMidi, levelFraction, midiNoteName, noteName } from "./pitch";
 
 describe("pitch helpers", () => {
   it("converts Hz to MIDI", () => {
@@ -17,6 +17,15 @@ describe("pitch helpers", () => {
     [452, "A4"], // 47 cents sharp still rounds to A4
   ])("names %f Hz as %s", (hz, name) => {
     expect(noteName(hz)).toBe(name);
+  });
+
+  it.each([
+    [69, "A4"],
+    [60.4, "C4"],
+    [59.6, "C4"],
+    [45, "A2"],
+  ])("names MIDI %f as %s", (midi, name) => {
+    expect(midiNoteName(midi)).toBe(name);
   });
 
   it.each([0, -1, Number.NaN])("has no note for %f Hz", (hz) => {

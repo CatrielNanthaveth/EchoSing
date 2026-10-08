@@ -1,4 +1,5 @@
 import type {
+  LinePractice,
   PitchResponse,
   SessionCreate,
   SessionCreated,
@@ -69,6 +70,18 @@ export class ApiClient {
     return this.#request(`/sessions/${encodeURIComponent(sessionId)}/results`, {
       signal: signal ?? null,
     });
+  }
+
+  /** How one line of a session was sung (practice chart). */
+  getLineAnalysis(
+    sessionId: string,
+    lineIndex: number,
+    signal?: AbortSignal,
+  ): Promise<LinePractice> {
+    return this.#request(
+      `/sessions/${encodeURIComponent(sessionId)}/lines/${String(lineIndex)}/analysis`,
+      { signal: signal ?? null },
+    );
   }
 
   /** URL of the karaoke track (MP3). */

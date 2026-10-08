@@ -146,6 +146,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/lines/{line_index}/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Line Analysis
+         * @description How one line was sung: reference vs sung curves, offsets and score.
+         */
+        get: operations["get_line_analysis_sessions__session_id__lines__line_index__analysis_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/songs": {
         parameters: {
             query?: never;
@@ -203,6 +223,26 @@ export interface paths {
          * @description Report the status of a song and of its latest ingestion job.
          */
         get: operations["get_song_status_admin_songs__song_id__status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/sessions/{session_id}/lines/{line_index}/debug": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Line Diagnostics
+         * @description Everything behind a line score: raw inputs, parameters and word timing.
+         */
+        get: operations["get_line_diagnostics_admin_sessions__session_id__lines__line_index__debug_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -306,6 +346,145 @@ export interface components {
             finished_at: string | null;
         };
         /**
+         * LineAnalysis
+         * @description A sung line explained frame by frame, on the scoring timeline.
+         *
+         *     Every list has one value per scoring frame from the line start; None marks
+         *     frames without voice (or without a value).
+         *
+         *     Attributes:
+         *         result: The line score, identical to ``score_line``.
+         *         hop_ms: Time between frames.
+         *         reference_midi: Reference pitch.
+         *         reference_weight: Confidence weight of each reference frame (0-1).
+         *         sung_midi: What was sung at each moment (latency undone), shifted by
+         *             whole octaves to the reference's register (``octave_shift``).
+         *         aligned_midi: For each sung reference frame, the sung pitch DTW
+         *             matched to it, in the reference's octave: what was scored.
+         *         credit: Credit (0-1) of each sung reference frame.
+         *         alignment_path: Pairs ``[reference_frame, sung_frame]`` of the
+         *             alignment path.
+         *         octave_shift: Whole octaves (in semitones) removed from ``sung_midi``,
+         *             e.g. -12 when the line was sung an octave lower.
+         *         timing_offset_ms: Median delay of the matched sung frames (positive:
+         *             sung late), None if nothing was matched.
+         *         pitch_offset_semitones: Median pitch error with sign (positive: sharp),
+         *             None if nothing was matched.
+         */
+        LineAnalysis: {
+            result: components["schemas"]["LineResult"];
+            /** Hop Ms */
+            hop_ms: number;
+            /** Reference Midi */
+            reference_midi: (number | null)[];
+            /** Reference Weight */
+            reference_weight: number[];
+            /** Sung Midi */
+            sung_midi: (number | null)[];
+            /** Aligned Midi */
+            aligned_midi: (number | null)[];
+            /** Credit */
+            credit: (number | null)[];
+            /** Alignment Path */
+            alignment_path: [
+                number,
+                number
+            ][];
+            /** Octave Shift */
+            octave_shift: number;
+            /** Timing Offset Ms */
+            timing_offset_ms: number | null;
+            /** Pitch Offset Semitones */
+            pitch_offset_semitones: number | null;
+        };
+        /**
+         * LineDiagnostics
+         * @description Everything behind a line score, for admins debugging sync and scoring.
+         *
+         *     Attributes:
+         *         latency_ms: Latency compensated for the session.
+         *         scoring: Exact scoring parameters used (difficulty included).
+         *         analysis_version: Version of the song analysis the session uses.
+         *         pipeline: Models that produced that analysis.
+         *         reference: Reference pitch of the line at its native resolution
+         *             (frame 0 at ``start_ms``).
+         *         sung_input: Pitch exactly as the client sent it, None if not stored.
+         *         word_timing: Words with their voicing and transcriber confidence.
+         */
+        LineDiagnostics: {
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Line Index */
+            line_index: number;
+            /** Text */
+            text: string;
+            /** Start Ms */
+            start_ms: number;
+            /** End Ms */
+            end_ms: number;
+            difficulty: components["schemas"]["Difficulty"];
+            /** Words */
+            words: components["schemas"]["PracticeWord"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "analyzed" | "not_sung" | "not_stored";
+            analysis: components["schemas"]["LineAnalysis"] | null;
+            /** Latency Ms */
+            latency_ms: number;
+            scoring: components["schemas"]["ScoringConfig"];
+            /** Analysis Version */
+            analysis_version: number;
+            pipeline: components["schemas"]["PipelineInfo"];
+            reference: components["schemas"]["PitchCurve"];
+            sung_input: components["schemas"]["SungPitch"] | null;
+            /** Word Timing */
+            word_timing: components["schemas"]["WordDiagnostics"][];
+        };
+        /**
+         * LinePractice
+         * @description How the player sang one line, for the practice chart.
+         *
+         *     Attributes:
+         *         session_id: Session.
+         *         line_index: Line.
+         *         text: Line text.
+         *         start_ms: Line start in the song.
+         *         end_ms: Line end in the song.
+         *         difficulty: Pitch tolerance the line was scored with.
+         *         words: Words of the line.
+         *         status: Whether there is an analysis (see ``AnalysisStatus``).
+         *         analysis: Curves, alignment and offsets; None unless ``analyzed``.
+         */
+        LinePractice: {
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Line Index */
+            line_index: number;
+            /** Text */
+            text: string;
+            /** Start Ms */
+            start_ms: number;
+            /** End Ms */
+            end_ms: number;
+            difficulty: components["schemas"]["Difficulty"];
+            /** Words */
+            words: components["schemas"]["PracticeWord"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "analyzed" | "not_sung" | "not_stored";
+            analysis: components["schemas"]["LineAnalysis"] | null;
+        };
+        /**
          * LineReport
          * @description Result of one lyric line in a session report.
          *
@@ -333,6 +512,30 @@ export interface components {
             accuracy: number | null;
             /** Hit */
             hit: boolean;
+        };
+        /**
+         * LineResult
+         * @description Score of one sung line.
+         *
+         *     Attributes:
+         *         scorable: False when the reference has too little singing to judge.
+         *         score: Weighted pitch score in [0, 100], None if not scorable.
+         *         accuracy: Fraction of reference frames sung within full credit, in
+         *             [0, 1], None if not scorable.
+         *         hit: Whether the score reaches the hit threshold.
+         *         voiced_frames: Sung reference frames, used to weight session totals.
+         */
+        LineResult: {
+            /** Scorable */
+            scorable: boolean;
+            /** Score */
+            score: number | null;
+            /** Accuracy */
+            accuracy: number | null;
+            /** Hit */
+            hit: boolean;
+            /** Voiced Frames */
+            voiced_frames: number;
         };
         /**
          * LyricLine
@@ -387,6 +590,47 @@ export interface components {
             lyrics: string;
         };
         /**
+         * PipelineInfo
+         * @description Models and parameters that produced the analysis, for reproducibility.
+         *
+         *     Attributes:
+         *         separator: Source separation model (e.g. ``htdemucs``).
+         *         transcriber: Speech recognition model (e.g. ``whisper-large-v3-turbo``).
+         *         pitch_extractor: Pitch model (e.g. ``torchcrepe-full``).
+         *         language: Language detected or forced during transcription.
+         */
+        PipelineInfo: {
+            /** Separator */
+            separator: string;
+            /** Transcriber */
+            transcriber: string;
+            /** Pitch Extractor */
+            pitch_extractor: string;
+            /** Language */
+            language?: string | null;
+        };
+        /**
+         * PitchCurve
+         * @description Pitch track sampled every ``hop_ms``; frame ``i`` is centered at ``i * hop_ms``.
+         *
+         *     Every frame keeps its pitch estimate and confidence, so the voicing decision
+         *     (which frames count as singing) is made when reading, not when storing.
+         *
+         *     Attributes:
+         *         hop_ms: Time between consecutive frames.
+         *         midi: Pitch per frame as fractional MIDI note number (69.0 = A4 =
+         *             440 Hz), rounded to 0.01 (1 cent); None when there is no estimate.
+         *         confidence: Voicing confidence per frame, as an integer in [0, 100].
+         */
+        PitchCurve: {
+            /** Hop Ms */
+            hop_ms: number;
+            /** Midi */
+            midi: (number | null)[];
+            /** Confidence */
+            confidence: number[];
+        };
+        /**
          * PitchResponse
          * @description Reference pitch of a song, or of one of its lines.
          *
@@ -421,6 +665,105 @@ export interface components {
          * @enum {string}
          */
         PlaySessionStatus: "active" | "finished";
+        /**
+         * PracticeWord
+         * @description A lyric word, timed from the line start.
+         *
+         *     Attributes:
+         *         text: Word as displayed.
+         *         start_ms: Start, relative to the line start.
+         *         end_ms: End, relative to the line start.
+         */
+        PracticeWord: {
+            /** Text */
+            text: string;
+            /** Start Ms */
+            start_ms: number;
+            /** End Ms */
+            end_ms: number;
+        };
+        /**
+         * ScoringConfig
+         * @description Tunable parameters of line scoring.
+         *
+         *     Attributes:
+         *         scoring_hop_ms: Frame period used to compare curves. Notes last at
+         *             least ~100 ms, so 20 ms loses nothing for intonation and keeps DTW
+         *             fast enough for real-time feedback.
+         *         min_reference_confidence: Reference frames below this confidence
+         *             (0-100) are not sung and not scored.
+         *         min_voiced_ms: Lines with less sung reference than this (e.g. spoken
+         *             passages) are not scorable.
+         *         full_credit_semitones: Errors up to this get full credit (0.5 = 50
+         *             cents, a quarter tone).
+         *         zero_credit_semitones: Errors from this up get no credit; credit
+         *             decreases linearly in between.
+         *         max_error_semitones: Cap of the frame error; also the cost of a sung
+         *             frame without voice.
+         *         octave_invariant: Whether singing an octave above or below is right.
+         *         max_warp_ms: How far (in time) the alignment may drift from the
+         *             diagonal: enough to enter late or hold a note, not enough to match
+         *             a neighboring note (None for no limit).
+         *         step_penalty_semitones: Cost of each non-diagonal alignment step. It
+         *             stops DTW from "rewarding" off-key singing by matching it to other
+         *             reference notes of the same height (without it, singing 1.5
+         *             semitones off scores 58 instead of 33). 2.0 gives the theoretical
+         *             scores for detuned singing while keeping late entries (150 ms ->
+         *             100) and rhythm variations (+-100 ms -> ~97) almost unpenalized.
+         *         hit_threshold: Line score from which the line counts as a hit.
+         */
+        ScoringConfig: {
+            /**
+             * Scoring Hop Ms
+             * @default 20
+             */
+            scoring_hop_ms: number;
+            /**
+             * Min Reference Confidence
+             * @default 50
+             */
+            min_reference_confidence: number;
+            /**
+             * Min Voiced Ms
+             * @default 200
+             */
+            min_voiced_ms: number;
+            /**
+             * Full Credit Semitones
+             * @default 0.5
+             */
+            full_credit_semitones: number;
+            /**
+             * Zero Credit Semitones
+             * @default 2
+             */
+            zero_credit_semitones: number;
+            /**
+             * Max Error Semitones
+             * @default 6
+             */
+            max_error_semitones: number;
+            /**
+             * Octave Invariant
+             * @default true
+             */
+            octave_invariant: boolean;
+            /**
+             * Max Warp Ms
+             * @default 200
+             */
+            max_warp_ms: number | null;
+            /**
+             * Step Penalty Semitones
+             * @default 2
+             */
+            step_penalty_semitones: number;
+            /**
+             * Hit Threshold
+             * @default 60
+             */
+            hit_threshold: number;
+        };
         /**
          * SeparationPreset
          * @description Source separation configuration chosen for a song.
@@ -729,6 +1072,20 @@ export interface components {
             /** Reprocessing */
             reprocessing: boolean;
         };
+        /**
+         * SungPitch
+         * @description Pitch the player sang over one line, as stored for later analysis.
+         *
+         *     Attributes:
+         *         hop_ms: Time between frames.
+         *         f0_hz: Pitch per frame from the line start, 0 where unvoiced.
+         */
+        SungPitch: {
+            /** Hop Ms */
+            hop_ms: number;
+            /** F0 Hz */
+            f0_hz: number[];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -761,6 +1118,28 @@ export interface components {
             end_ms: number;
             /** Probability */
             probability?: number | null;
+        };
+        /**
+         * WordDiagnostics
+         * @description A word with what is known about its timing.
+         *
+         *     Attributes:
+         *         voiced_ratio: Fraction of the word's span where the reference vocals
+         *             have voice. Low values on sung words point to lyrics out of sync.
+         *         probability: Transcriber confidence, None for official lyrics words
+         *             without a transcribed match.
+         */
+        WordDiagnostics: {
+            /** Text */
+            text: string;
+            /** Start Ms */
+            start_ms: number;
+            /** End Ms */
+            end_ms: number;
+            /** Voiced Ratio */
+            voiced_ratio: number;
+            /** Probability */
+            probability: number | null;
         };
         /**
          * ErrorCode
@@ -1196,6 +1575,45 @@ export interface operations {
             };
         };
     };
+    get_line_analysis_sessions__session_id__lines__line_index__analysis_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                line_index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinePractice"];
+                };
+            };
+            /** @description Session or line not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     upload_song_admin_songs_post: {
         parameters: {
             query?: never;
@@ -1340,6 +1758,54 @@ export interface operations {
                 content?: never;
             };
             /** @description Song not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_line_diagnostics_admin_sessions__session_id__lines__line_index__debug_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-admin-token"?: string | null;
+            };
+            path: {
+                session_id: string;
+                line_index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LineDiagnostics"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session or line not found */
             404: {
                 headers: {
                     [name: string]: unknown;
