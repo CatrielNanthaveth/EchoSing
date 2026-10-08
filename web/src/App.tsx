@@ -2,6 +2,7 @@ import { Link, Route, Routes } from "react-router";
 
 import { CatalogPage } from "./pages/CatalogPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
+import { SongPage } from "./pages/SongPage";
 
 export function App() {
   return (
@@ -14,6 +15,7 @@ export function App() {
       <main className="app-main">
         <Routes>
           <Route path="/" element={<CatalogPage />} />
+          <Route path="/songs/:songId" element={<SongPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>

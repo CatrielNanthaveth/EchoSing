@@ -182,7 +182,8 @@ Una canción es *jugable* si tiene análisis actual e instrumental, sin importar
   cliente de API tipado con tipos generados del OpenAPI (incluye mensajes del WS).
 - [x] **US-6.2** Catálogo con búsqueda (debounce, en la URL), paginación y marca de
   "reprocesando".
-- [ ] **US-6.3** Reproductor: instrumental + letras sincronizadas por palabra.
+- [x] **US-6.3** Reproductor: instrumental decodificado en Web Audio (reloj del
+  `AudioContext`), letra sincronizada por palabra con cuenta regresiva y progreso.
 - [ ] **US-6.4** Calibración de latencia (tap al oír un pitido).
 - [ ] **US-6.5** Micrófono + YIN en AudioWorklet, F0 acumulado por línea.
 - [ ] **US-6.6** Envío por WebSocket y feedback visual por línea.

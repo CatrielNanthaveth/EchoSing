@@ -185,3 +185,91 @@ input {
   justify-content: center;
   margin-top: 1.5rem;
 }
+
+/* Karaoke */
+
+.karaoke-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.karaoke-header h1 {
+  margin: 0;
+}
+
+.karaoke-header p {
+  margin: 0;
+}
+
+.lyrics {
+  margin: 2.5rem 0;
+  min-height: 12rem;
+  text-align: center;
+}
+
+.lyrics p {
+  margin: 0.5rem 0;
+}
+
+.lyrics-countdown {
+  min-height: 2rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.lyrics-current {
+  font-size: clamp(1.4rem, 4vw, 2.2rem);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.lyrics-current.active {
+  color: var(--text);
+}
+
+.lyrics-current .word {
+  transition: color 80ms linear;
+}
+
+.lyrics-current .word.sung {
+  color: var(--accent);
+}
+
+.lyrics-next {
+  min-height: 1.75rem;
+  font-size: 1.15rem;
+  color: var(--muted);
+}
+
+.song-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.song-progress-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.song-progress-bar {
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+}
+
+.karaoke-controls {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
