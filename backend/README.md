@@ -326,6 +326,17 @@ behavior: exact or octave-shifted singing 100; 1 semitone off 100 (easy), ~86
 (normal), ~67 (hard); 150 ms late 100; random notes ~35. An 8 s line is
 scored in ~16 ms.
 
+**Rap mode** (`app/scoring/rhythm.py`) ignores pitch and scores when each syllable
+is hit. Attacks are sudden rises in loudness (>= 6 dB over the previous 50 ms, not
+far below the line's peak), found by the same detector on the vocals' `level` curve
+and on the singer's microphone level (`level_db`); consonants count, unlike with
+voicing. Attacks are paired in order (weighted longest common subsequence); each
+pair gets full credit within 40 ms and none from 100 ms (normal; easy 50/130, hard
+30/75), and the line score is the credit over the reference attacks plus the extra
+sung ones. On real rap (attacks ~180 ms apart) a precise rapper scores ~78 and
+random timing ~33. Offsets beyond half the syllable spacing read as the neighboring
+syllable.
+
 The scoring package must keep 100% test coverage:
 
 ```bash
