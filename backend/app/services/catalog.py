@@ -167,6 +167,7 @@ class CatalogService:
             **_summary(playable).model_dump(),
             analysis_id=current.analysis_id,
             analysis_version=current.version,
+            rap_mode_available=current.has_level,
             lines=_LINES.validate_python(current.lines),
         )
 

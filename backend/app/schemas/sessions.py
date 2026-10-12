@@ -7,7 +7,7 @@ from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.domain.enums import Difficulty, PlaySessionStatus
+from app.domain.enums import Difficulty, PlaySessionStatus, ScoringMode
 
 
 class SessionCreate(BaseModel):
@@ -18,7 +18,9 @@ class SessionCreate(BaseModel):
         player_name: Display name of the anonymous player.
         latency_offset_ms: Audio latency measured by the client's calibration;
             positive when the voice arrives late.
-        difficulty: Pitch tolerance of the scoring.
+        difficulty: Pitch (or timing) tolerance of the scoring.
+        mode: What is scored: ``melody`` (pitch) or ``rhythm`` (rap: timing of
+            the syllables, ignoring pitch; needs the client's ``level_db``).
     """
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -27,6 +29,7 @@ class SessionCreate(BaseModel):
     player_name: str = Field(min_length=1, max_length=50)
     latency_offset_ms: int = Field(default=0, ge=-500, le=1000)
     difficulty: Difficulty = Difficulty.NORMAL
+    mode: ScoringMode = ScoringMode.MELODY
 
 
 class SessionCreated(BaseModel):
@@ -40,7 +43,8 @@ class SessionCreated(BaseModel):
         line_count: Number of lyric lines to sing.
         player_name: Display name of the player.
         latency_offset_ms: Latency applied when scoring.
-        difficulty: Pitch tolerance of the scoring.
+        difficulty: Pitch (or timing) tolerance of the scoring.
+        mode: What is scored.
     """
 
     session_id: uuid.UUID
@@ -51,6 +55,7 @@ class SessionCreated(BaseModel):
     player_name: str
     latency_offset_ms: int
     difficulty: Difficulty
+    mode: ScoringMode
 
 
 # --- WebSocket messages (see docs/ws-protocol.md) ---------------------------------
@@ -248,7 +253,8 @@ class SessionResults(BaseModel):
         song_id: Song sung.
         analysis_id: Analysis the session was scored against.
         player_name: Display name of the player.
-        difficulty: Pitch tolerance the session is scored with.
+        difficulty: Tolerance the session is scored with.
+        mode: What the session scores.
         status: ``active`` or ``finished``.
         started_at: When the session started.
         finished_at: When it finished, if it did.
@@ -261,6 +267,7 @@ class SessionResults(BaseModel):
     analysis_id: uuid.UUID
     player_name: str
     difficulty: Difficulty
+    mode: ScoringMode
     status: PlaySessionStatus
     started_at: datetime
     finished_at: datetime | None

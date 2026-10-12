@@ -5,11 +5,12 @@ from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, Field, model_validator
 
-from app.domain.enums import Difficulty
-from app.schemas.analysis import PipelineInfo, PitchCurve
+from app.domain.enums import Difficulty, ScoringMode
+from app.schemas.analysis import LevelCurve, PipelineInfo, PitchCurve
 from app.schemas.sessions import MAX_PITCH_FRAMES, LevelDb, SungPitch
 from app.scoring.analysis import LineAnalysis
 from app.scoring.line_score import ScoringConfig
+from app.scoring.rhythm import RhythmAnalysis, RhythmConfig
 
 AnalysisStatus = Literal["analyzed", "not_sung", "not_stored"]
 """``not_sung``: the line was not sung; ``not_stored``: sung before curves were
@@ -27,7 +28,8 @@ class LineAttempt(BaseModel):
         level_db: Optional microphone level per frame (dBFS), as in
             ``line_pitch``.
         latency_offset_ms: Latency measured by the client's calibration.
-        difficulty: Pitch tolerance.
+        difficulty: Pitch (or timing) tolerance.
+        mode: What is scored; ``rhythm`` needs ``level_db``.
     """
 
     analysis_id: uuid.UUID
@@ -38,12 +40,29 @@ class LineAttempt(BaseModel):
     level_db: list[LevelDb] | None = Field(default=None, max_length=MAX_PITCH_FRAMES)
     latency_offset_ms: int = Field(default=0, ge=-500, le=1000)
     difficulty: Difficulty = Difficulty.NORMAL
+    mode: ScoringMode = ScoringMode.MELODY
 
     @model_validator(mode="after")
     def _check_level_frames(self) -> Self:
         if self.level_db is not None and len(self.level_db) != len(self.f0_hz):
             raise ValueError("level_db must have one value per f0_hz frame")
+        if self.mode is ScoringMode.RHYTHM and self.level_db is None:
+            raise ValueError("rhythm mode needs level_db")
         return self
+
+
+class LineScoring(BaseModel):
+    """A sung line scored and explained in its mode.
+
+    Attributes:
+        mode: What was scored.
+        analysis: Melody mode: pitch curves, alignment and offsets.
+        rhythm: Rap mode: syllable attacks, pairs and timing offset.
+    """
+
+    mode: ScoringMode
+    analysis: LineAnalysis | None
+    rhythm: RhythmAnalysis | None
 
 
 class PracticeWord(BaseModel):
@@ -69,10 +88,13 @@ class LinePractice(BaseModel):
         text: Line text.
         start_ms: Line start in the song.
         end_ms: Line end in the song.
-        difficulty: Pitch tolerance the line was scored with.
+        difficulty: Tolerance the line was scored with.
+        mode: What the session scores.
         words: Words of the line.
         status: Whether there is an analysis (see ``AnalysisStatus``).
-        analysis: Curves, alignment and offsets; None unless ``analyzed``.
+        analysis: Melody mode: curves, alignment and offsets; None unless
+            ``analyzed``.
+        rhythm: Rap mode: attacks and their timing; None unless ``analyzed``.
     """
 
     session_id: uuid.UUID
@@ -81,9 +103,11 @@ class LinePractice(BaseModel):
     start_ms: int
     end_ms: int
     difficulty: Difficulty
+    mode: ScoringMode
     words: list[PracticeWord]
     status: AnalysisStatus
     analysis: LineAnalysis | None
+    rhythm: RhythmAnalysis | None
 
 
 class WordDiagnostics(PracticeWord):
@@ -105,19 +129,24 @@ class LineDiagnostics(LinePractice):
 
     Attributes:
         latency_ms: Latency compensated for the session.
-        scoring: Exact scoring parameters used (difficulty included).
+        scoring: Exact pitch scoring parameters (difficulty included).
+        rhythm_scoring: Exact rhythm scoring parameters (rap mode).
         analysis_version: Version of the song analysis the session uses.
         pipeline: Models that produced that analysis.
         reference: Reference pitch of the line at its native resolution
             (frame 0 at ``start_ms``).
+        reference_level: Loudness of the reference vocals over the line, if
+            the analysis has it.
         sung_input: Pitch exactly as the client sent it, None if not stored.
         word_timing: Words with their voicing and transcriber confidence.
     """
 
     latency_ms: int
     scoring: ScoringConfig
+    rhythm_scoring: RhythmConfig
     analysis_version: int
     pipeline: PipelineInfo
     reference: PitchCurve
+    reference_level: LevelCurve | None
     sung_input: SungPitch | None
     word_timing: list[WordDiagnostics]

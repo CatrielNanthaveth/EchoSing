@@ -262,9 +262,11 @@ async def test_attempt_is_scored_like_a_session_line(
 
     assert response.status_code == 200
     body = response.json()
-    assert body["result"]["score"] == pytest.approx(expected, abs=0.01)
-    assert body["timing_offset_ms"] == 0.0
-    assert body["pitch_offset_semitones"] == semitones
+    assert (body["mode"], body["rhythm"]) == ("melody", None)
+    analysis = body["analysis"]
+    assert analysis["result"]["score"] == pytest.approx(expected, abs=0.01)
+    assert analysis["timing_offset_ms"] == 0.0
+    assert analysis["pitch_offset_semitones"] == semitones
 
 
 async def test_attempt_stores_nothing(

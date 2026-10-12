@@ -65,6 +65,18 @@ class Difficulty(StrEnum):
     HARD = "hard"
 
 
+class ScoringMode(StrEnum):
+    """What a play session scores.
+
+    Attributes:
+        MELODY: Pitch: singing the notes of the melody.
+        RHYTHM: Rap: hitting the syllables on time, ignoring pitch.
+    """
+
+    MELODY = "melody"
+    RHYTHM = "rhythm"
+
+
 class PlaySessionStatus(StrEnum):
     """Lifecycle of a karaoke play session."""
 

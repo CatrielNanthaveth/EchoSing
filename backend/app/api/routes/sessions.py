@@ -20,6 +20,7 @@ from app.schemas.sessions import (
     SessionSummaryMessage,
 )
 from app.services.errors import SongNotFoundError
+from app.services.line_scoring import MissingLevelError, RhythmUnavailableError
 from app.services.play_sessions import (
     LineAlreadyScoredError,
     PlaySessionService,
@@ -42,7 +43,10 @@ CLOSE_SESSION_FINISHED = 4409
 @router.post(
     "/sessions",
     status_code=status.HTTP_201_CREATED,
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Song not available"}},
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "Song not available"},
+        status.HTTP_409_CONFLICT: {"description": "Rap mode unavailable for the song"},
+    },
 )
 async def create_session(
     body: SessionCreate,
@@ -53,6 +57,8 @@ async def create_session(
         return await service.create(body)
     except SongNotFoundError as error:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except RhythmUnavailableError as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
 
 
 @router.get(
@@ -143,6 +149,11 @@ async def session_socket(
                 await _send(
                     websocket,
                     ErrorMessage(code=ErrorCode.UNKNOWN_LINE, detail=str(error)),
+                )
+            except MissingLevelError as error:
+                await _send(
+                    websocket,
+                    ErrorMessage(code=ErrorCode.INVALID_MESSAGE, detail=str(error)),
                 )
             except LineAlreadyScoredError as error:
                 await _send(

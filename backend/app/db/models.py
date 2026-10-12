@@ -29,6 +29,7 @@ from app.domain.enums import (
     Difficulty,
     IngestionStage,
     PlaySessionStatus,
+    ScoringMode,
     SeparationPreset,
     SongStatus,
 )
@@ -150,6 +151,11 @@ class PlaySession(Base):
         str_enum(Difficulty, "difficulty"),
         default=Difficulty.NORMAL,
         server_default=Difficulty.NORMAL.value,
+    )
+    mode: Mapped[ScoringMode] = mapped_column(
+        str_enum(ScoringMode, "scoring_mode"),
+        default=ScoringMode.MELODY,
+        server_default=ScoringMode.MELODY.value,
     )
     status: Mapped[PlaySessionStatus] = mapped_column(
         str_enum(PlaySessionStatus, "play_session_status"),

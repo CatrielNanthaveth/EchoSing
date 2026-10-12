@@ -14,6 +14,12 @@ POST /sessions
 `latency_offset_ms` is the audio latency measured by the client's calibration
 (positive: the voice arrives late, e.g. Bluetooth headphones). Range -500..1000.
 
+`mode` (optional, default `melody`): `melody` scores the pitch; `rhythm` (rap mode)
+scores when each syllable is hit and ignores pitch. Rap mode needs `level_db` in
+every `line_pitch` and a song whose analysis has the vocals' level
+(`rap_mode_available` in `GET /songs/{id}`); otherwise the session is refused with
+`409`. The rap timing tolerances per difficulty are in `backend/README.md`.
+
 `difficulty` (optional, default `normal`) sets the pitch tolerance:
 
 | Level | Full credit within | No credit from |

@@ -280,7 +280,7 @@ instrument overtones, so the instrumental can sound duller where they were remov
 
 | Endpoint | Does |
 |---|---|
-| `POST /sessions` | Starts a session (`song_id`, `player_name`, `latency_offset_ms`, `difficulty`) bound to the song's current analysis |
+| `POST /sessions` | Starts a session (`song_id`, `player_name`, `latency_offset_ms`, `difficulty`, `mode`: `melody` or `rhythm` for rap) bound to the song's current analysis |
 | `WS /ws/sessions/{id}` | Scores each sung line in real time (protocol: `docs/ws-protocol.md`) |
 | `GET /sessions/{id}/results` | Totals and the result of every line |
 | `GET /sessions/{id}/lines/{n}/analysis` | How a line was sung (practice chart): reference vs sung curves, the alignment, timing and pitch offsets |

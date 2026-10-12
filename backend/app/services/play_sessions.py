@@ -6,9 +6,7 @@ from dataclasses import dataclass, field
 from functools import partial
 from typing import Annotated
 
-import numpy as np
 from fastapi import Depends
-from pydantic import TypeAdapter
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,8 +14,8 @@ from app.db.repositories.catalog import CatalogRepository
 from app.db.repositories.play_sessions import PlaySessionRepository
 from app.db.repositories.songs import SongAnalysisRepository
 from app.db.session import get_db_session
-from app.domain.enums import PlaySessionStatus
-from app.schemas.analysis import LyricLine, PitchCurve
+from app.domain.enums import Difficulty, PlaySessionStatus, ScoringMode
+from app.schemas.analysis import LyricLine
 from app.schemas.sessions import (
     LinePitchMessage,
     LineReport,
@@ -28,12 +26,11 @@ from app.schemas.sessions import (
     SessionTotals,
     SungPitch,
 )
-from app.scoring.difficulty import scoring_config
-from app.scoring.line_score import LineResult, ScoringConfig, score_line
+from app.scoring.line_score import LineResult, ScoringConfig
+from app.scoring.rhythm import RhythmConfig
 from app.scoring.session import current_streak, summarize_session
 from app.services.errors import SongNotFoundError
-
-_LINES = TypeAdapter(list[LyricLine])
+from app.services.line_scoring import LineScorer, SongReference
 
 
 class SessionNotFoundError(Exception):
@@ -60,19 +57,22 @@ class LiveSession:
         session_id: Id of the session.
         analysis_id: Analysis the session is scored against.
         latency_ms: Latency compensated when scoring.
-        scoring: Scoring parameters of the session's difficulty.
-        lines: Lyric lines of the analysis.
-        pitch: Reference pitch curve of the whole song.
+        scorer: Scores lines in the session's mode and difficulty.
+        reference: Lines and reference curves of the analysis.
         results: Results of the lines scored so far, by line index.
     """
 
     session_id: uuid.UUID
     analysis_id: uuid.UUID
     latency_ms: int
-    scoring: ScoringConfig
-    lines: list[LyricLine]
-    pitch: PitchCurve
+    scorer: LineScorer
+    reference: SongReference
     results: dict[int, LineResult] = field(default_factory=dict)
+
+    @property
+    def lines(self) -> list[LyricLine]:
+        """Lyric lines of the analysis."""
+        return self.reference.lines
 
 
 def _line_report(
@@ -110,17 +110,22 @@ class PlaySessionService:
     """Manages the lifecycle of play sessions."""
 
     def __init__(
-        self, session: AsyncSession, scoring: ScoringConfig | None = None
+        self,
+        session: AsyncSession,
+        scoring: ScoringConfig | None = None,
+        rhythm: RhythmConfig | None = None,
     ) -> None:
         """Initialize the service.
 
         Args:
             session: Database session; this service commits its own changes.
-            scoring: Base scoring parameters; each session applies the pitch
+            scoring: Base pitch scoring parameters; each session applies the
                 tolerance of its difficulty on top.
+            rhythm: Base rhythm (rap mode) parameters, likewise.
         """
         self._session = session
         self._scoring = scoring or ScoringConfig()
+        self._rhythm = rhythm or RhythmConfig()
         self._catalog = CatalogRepository(session)
         self._analyses = SongAnalysisRepository(session)
         self._play_sessions = PlaySessionRepository(session)
@@ -143,18 +148,16 @@ class PlaySessionService:
             raise SessionNotFoundError(f"Session {session_id} does not exist")
         if play_session.status is PlaySessionStatus.FINISHED:
             raise SessionFinishedError(f"Session {session_id} is already finished")
-        reference = await self._analyses.get_reference(play_session.analysis_id)
-        if reference is None:  # pragma: no cover - guaranteed by the foreign key
+        raw = await self._analyses.get_reference(play_session.analysis_id)
+        if raw is None:  # pragma: no cover - guaranteed by the foreign key
             raise SessionNotFoundError(f"Session {session_id} has no analysis")
-        raw_pitch, raw_lines = reference
         scored = await self._play_sessions.list_line_scores(session_id)
         return LiveSession(
             session_id=session_id,
             analysis_id=play_session.analysis_id,
             latency_ms=play_session.latency_offset_ms,
-            scoring=scoring_config(play_session.difficulty, self._scoring),
-            lines=_LINES.validate_python(raw_lines),
-            pitch=PitchCurve.model_validate(raw_pitch),
+            scorer=self._scorer(play_session.mode, play_session.difficulty),
+            reference=SongReference.from_raw(raw),
             results={
                 row.line_index: _result_from_row(
                     row.scorable, row.score, row.accuracy, row.hit, row.voiced_frames
@@ -180,6 +183,8 @@ class PlaySessionService:
         Raises:
             UnknownLineError: If the line does not exist.
             LineAlreadyScoredError: If the line was already scored.
+            app.services.line_scoring.MissingLevelError: Rap mode without the
+                microphone level.
         """
         index = message.line_index
         if index >= len(live.lines):
@@ -189,17 +194,17 @@ class PlaySessionService:
         if index in live.results:
             raise LineAlreadyScoredError(f"Line {index} was already scored")
 
-        line = live.lines[index]
-        reference = live.pitch.slice_ms(line.start_ms, line.end_ms)
+        sung = SungPitch(
+            hop_ms=message.hop_ms, f0_hz=message.f0_hz, level_db=message.level_db
+        )
         result = await asyncio.get_running_loop().run_in_executor(
             None,
             partial(
-                score_line,
-                reference,
-                np.asarray(message.f0_hz, dtype=np.float64),
-                message.hop_ms,
-                latency_ms=live.latency_ms,
-                config=live.scoring,
+                live.scorer.score,
+                live.reference,
+                live.lines[index],
+                sung,
+                live.latency_ms,
             ),
         )
 
@@ -212,11 +217,7 @@ class PlaySessionService:
                 result.hit,
                 scorable=result.scorable,
                 voiced_frames=result.voiced_frames,
-                sung_pitch=SungPitch(
-                    hop_ms=message.hop_ms,
-                    f0_hz=message.f0_hz,
-                    level_db=message.level_db,
-                ).model_dump(exclude_none=True),
+                sung_pitch=sung.model_dump(exclude_none=True),
             )
             await self._session.commit()
         except IntegrityError as error:  # scored concurrently by another socket
@@ -233,12 +234,14 @@ class PlaySessionService:
             streak=current_streak(live.results, index),
         )
 
+    def _scorer(self, mode: ScoringMode, difficulty: Difficulty) -> LineScorer:
+        return LineScorer.create(mode, difficulty, self._scoring, self._rhythm)
+
     @staticmethod
     def _with_unsung_lines(
-        lines: list[LyricLine],
-        pitch: PitchCurve,
+        reference: SongReference,
         sung: dict[int, LineResult],
-        scoring: ScoringConfig,
+        scorer: LineScorer,
     ) -> dict[int, LineResult]:
         """Results of every line, scoring the unsung ones as silence (0).
 
@@ -247,14 +250,9 @@ class PlaySessionService:
         tell "sung badly" from "not sung".
         """
         complete = dict(sung)
-        for line in lines:
+        for line in reference.lines:
             if line.index not in complete:
-                complete[line.index] = score_line(
-                    pitch.slice_ms(line.start_ms, line.end_ms),
-                    np.zeros(0),
-                    scoring.scoring_hop_ms,
-                    config=scoring,
-                )
+                complete[line.index] = scorer.silence(reference, line)
         return complete
 
     async def finish(self, live: LiveSession) -> SessionTotals:
@@ -275,9 +273,7 @@ class PlaySessionService:
         play_session = await self._play_sessions.get(live.session_id)
         if play_session is None:  # pragma: no cover - sessions are never deleted
             raise SessionNotFoundError(f"Session {live.session_id} does not exist")
-        complete = self._with_unsung_lines(
-            live.lines, live.pitch, live.results, live.scoring
-        )
+        complete = self._with_unsung_lines(live.reference, live.results, live.scorer)
         summary = summarize_session([complete[i] for i in sorted(complete)])
         await self._play_sessions.finish(
             play_session,
@@ -305,11 +301,10 @@ class PlaySessionService:
         play_session = await self._play_sessions.get(session_id)
         if play_session is None:
             raise SessionNotFoundError(f"Session {session_id} does not exist")
-        reference = await self._analyses.get_reference(play_session.analysis_id)
-        if reference is None:  # pragma: no cover - guaranteed by the foreign key
+        raw = await self._analyses.get_reference(play_session.analysis_id)
+        if raw is None:  # pragma: no cover - guaranteed by the foreign key
             raise SessionNotFoundError(f"Session {session_id} has no analysis")
-        raw_pitch, raw_lines = reference
-        lines = _LINES.validate_python(raw_lines)
+        reference = SongReference.from_raw(raw)
         sung = {
             row.line_index: _result_from_row(
                 row.scorable, row.score, row.accuracy, row.hit, row.voiced_frames
@@ -319,10 +314,9 @@ class PlaySessionService:
         finished = play_session.status is PlaySessionStatus.FINISHED
         results = (
             self._with_unsung_lines(
-                lines,
-                PitchCurve.model_validate(raw_pitch),
+                reference,
                 sung,
-                scoring_config(play_session.difficulty, self._scoring),
+                self._scorer(play_session.mode, play_session.difficulty),
             )
             if finished
             else sung
@@ -334,11 +328,15 @@ class PlaySessionService:
             analysis_id=play_session.analysis_id,
             player_name=play_session.player_name,
             difficulty=play_session.difficulty,
+            mode=play_session.mode,
             status=play_session.status,
             started_at=play_session.started_at,
             finished_at=play_session.finished_at,
             totals=SessionTotals.model_validate(summary.model_dump()),
-            lines=[_line_report(line, line.index in sung, results) for line in lines],
+            lines=[
+                _line_report(line, line.index in sung, results)
+                for line in reference.lines
+            ],
         )
 
     async def create(self, request: SessionCreate) -> SessionCreated:
@@ -352,12 +350,21 @@ class PlaySessionService:
 
         Raises:
             SongNotFoundError: If the song does not exist or is not playable.
+            app.services.line_scoring.RhythmUnavailableError: Rap mode on a
+                song whose analysis has no vocals' level.
         """
         playable = await self._catalog.get_playable(request.song_id)
         identity = await self._analyses.get_current_identity(request.song_id)
         if playable is None or identity is None:
             raise SongNotFoundError(f"Song {request.song_id} is not available")
         analysis_id, version = identity
+        if request.mode is ScoringMode.RHYTHM:
+            raw = await self._analyses.get_reference(analysis_id)
+            if raw is None:  # pragma: no cover - read in the same transaction
+                raise SongNotFoundError(f"Song {request.song_id} is not available")
+            self._scorer(request.mode, request.difficulty).check(
+                SongReference.from_raw(raw)
+            )
 
         play_session = await self._play_sessions.start(
             request.song_id,
@@ -365,6 +372,7 @@ class PlaySessionService:
             request.player_name,
             request.latency_offset_ms,
             request.difficulty,
+            request.mode,
         )
         await self._session.commit()
         return SessionCreated(
@@ -376,6 +384,7 @@ class PlaySessionService:
             player_name=play_session.player_name,
             latency_offset_ms=play_session.latency_offset_ms,
             difficulty=play_session.difficulty,
+            mode=play_session.mode,
         )
 
 

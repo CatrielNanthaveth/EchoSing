@@ -39,12 +39,14 @@ class CurrentAnalysisLines(BaseModel):
         version: Version number of the analysis.
         format_version: Format version of the analysis data.
         lines: Raw ``lines`` value of the analysis data.
+        has_level: Whether the analysis has the vocals' level (rap mode).
     """
 
     analysis_id: uuid.UUID
     version: int
     format_version: int
     lines: list[dict[str, Any]]
+    has_level: bool = False
 
 
 def _escape_like(text: str) -> str:
@@ -143,17 +145,19 @@ class CatalogRepository:
                     SongAnalysis.version,
                     SongAnalysis.format_version,
                     SongAnalysis.data["lines"],
+                    func.jsonb_typeof(SongAnalysis.data["level"]) == "object",
                 ).where(SongAnalysis.song_id == song_id, SongAnalysis.is_current)
             )
         ).first()
         if row is None:
             return None
-        analysis_id, version, format_version, lines = row
+        analysis_id, version, format_version, lines, has_level = row
         return CurrentAnalysisLines(
             analysis_id=analysis_id,
             version=version,
             format_version=format_version,
             lines=lines,
+            has_level=bool(has_level),
         )
 
     async def get_current_pitch(

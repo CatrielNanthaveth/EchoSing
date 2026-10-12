@@ -2,7 +2,7 @@
 
 import uuid
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, NamedTuple
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -184,6 +184,20 @@ class SongRepository:
         return result.all()
 
 
+class AnalysisReference(NamedTuple):
+    """Raw reference values of an analysis (validated by the caller).
+
+    Attributes:
+        pitch: The ``pitch`` value.
+        lines: The ``lines`` value.
+        level: The ``level`` value, None in analyses without it.
+    """
+
+    pitch: dict[str, Any]
+    lines: list[dict[str, Any]]
+    level: dict[str, Any] | None
+
+
 class SongAnalysisRepository:
     """Data access for versioned ``SongAnalysis`` rows."""
 
@@ -233,24 +247,25 @@ class SongAnalysisRepository:
 
     async def get_reference(
         self, analysis_id: uuid.UUID, song_id: uuid.UUID | None = None
-    ) -> tuple[dict[str, Any], list[dict[str, Any]]] | None:
-        """Fetch the pitch curve and lines of a specific analysis version.
+    ) -> AnalysisReference | None:
+        """Fetch the pitch curve, lines and level of a specific analysis version.
 
         Args:
             analysis_id: Id of the analysis (not necessarily the current one).
             song_id: If given, the analysis must belong to this song.
 
         Returns:
-            The raw ``pitch`` and ``lines`` values, or None if it does not
-            exist (for that song).
+            The raw values, or None if it does not exist (for that song).
         """
-        query = select(SongAnalysis.data["pitch"], SongAnalysis.data["lines"]).where(
-            SongAnalysis.id == analysis_id
-        )
+        query = select(
+            SongAnalysis.data["pitch"],
+            SongAnalysis.data["lines"],
+            SongAnalysis.data["level"],
+        ).where(SongAnalysis.id == analysis_id)
         if song_id is not None:
             query = query.where(SongAnalysis.song_id == song_id)
         row = (await self._session.execute(query)).first()
-        return None if row is None else (row[0], row[1])
+        return None if row is None else AnalysisReference(row[0], row[1], row[2])
 
     async def get_metadata(
         self, analysis_id: uuid.UUID

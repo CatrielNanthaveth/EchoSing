@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import undefer
 
 from app.db.models import LineScore, PlaySession, SongAnalysis
-from app.domain.enums import Difficulty, PlaySessionStatus
+from app.domain.enums import Difficulty, PlaySessionStatus, ScoringMode
 
 
 class PlaySessionRepository:
@@ -55,6 +55,7 @@ class PlaySessionRepository:
         player_name: str,
         latency_offset_ms: int = 0,
         difficulty: Difficulty = Difficulty.NORMAL,
+        mode: ScoringMode = ScoringMode.MELODY,
     ) -> PlaySession:
         """Start a play session from the identity of an analysis.
 
@@ -67,6 +68,7 @@ class PlaySessionRepository:
             player_name: Display name of the anonymous player.
             latency_offset_ms: Audio latency measured during calibration.
             difficulty: Pitch tolerance of the scoring.
+            mode: What is scored: melody or rhythm (rap).
 
         Returns:
             The persisted session in ``ACTIVE`` status.
@@ -77,6 +79,7 @@ class PlaySessionRepository:
             player_name=player_name,
             latency_offset_ms=latency_offset_ms,
             difficulty=difficulty,
+            mode=mode,
         )
         self._session.add(play_session)
         await self._session.flush()

@@ -54,11 +54,14 @@ class SongDetail(SongSummary):
     Attributes:
         analysis_id: Id of the current analysis; play sessions are bound to it.
         analysis_version: Version number of the current analysis.
+        rap_mode_available: Whether the analysis has the vocals' level that
+            rap mode (rhythm scoring) needs.
         lines: Lyric lines with timed words (the pitch curve is served apart).
     """
 
     analysis_id: uuid.UUID
     analysis_version: int
+    rap_mode_available: bool
     lines: list[LyricLine]
 
 
