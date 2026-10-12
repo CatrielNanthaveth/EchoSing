@@ -35,6 +35,11 @@ early), a chart of the melody vs your voice and a per-word table.
 melody and your voice live, scores every attempt (nothing is stored) and keeps the
 history; an optional guide melody plays the line's notes (use headphones).
 
+**Rap mode**: choose "Modo: Rap" next to the difficulty (remembered per song; only
+for songs whose analysis has the vocals' level). It ignores pitch and scores when each
+syllable is hit: results and practice show the attacks of the original and yours,
+paired, and live practice draws both loudness envelopes.
+
 **Admin diagnostics** (not linked from the app): replace `/sessions/{id}/results` with
 `/admin/sesiones/{id}` and enter the API's `ECHOSING_ADMIN_TOKEN` (kept in this
 browser). Per line it shows the voice before the latency compensation, words with

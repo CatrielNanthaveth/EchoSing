@@ -6,6 +6,7 @@ import { useAsync } from "../hooks/useAsync";
 import { midiNoteName } from "../lib/pitch";
 import { chartRows, practiceAdvice, wordStats } from "../lib/practice";
 import { PitchChart } from "./PitchChart";
+import { RhythmView } from "./RhythmView";
 
 const NOT_SUNG = "No cantaste este verso.";
 const NOT_STORED =
@@ -46,7 +47,8 @@ export function LinePracticePanel({
 }
 
 export function PracticeView({ practice }: { practice: LinePractice }) {
-  const { analysis } = practice;
+  const { analysis, rhythm } = practice;
+  if (rhythm !== null) return <RhythmView analysis={rhythm} words={practice.words} />;
   if (analysis === null) {
     return (
       <p className="muted">

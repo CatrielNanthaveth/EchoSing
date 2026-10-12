@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { ApiError, api } from "../api/client";
 import type { SongDetail } from "../api/types";
 import { LyricsView } from "../components/LyricsView";
+import { ModeSelect } from "../components/ModeSelect";
 import { PitchMeter } from "../components/PitchMeter";
 import { ScoreCard } from "../components/ScoreCard";
 import { SongProgress } from "../components/SongProgress";
@@ -17,6 +18,7 @@ import {
   type Difficulty,
 } from "../settings/difficulty";
 import { loadLatency } from "../settings/latency";
+import { DEFAULT_MODE, loadMode, saveMode } from "../settings/mode";
 import {
   MAX_PLAYER_NAME,
   loadPlayerName,
@@ -49,6 +51,9 @@ export function SongPage() {
 function Karaoke({ song }: { song: SongDetail }) {
   const [playerName, setPlayerName] = useState(loadPlayerName);
   const [difficulty, setDifficulty] = useState(loadDifficulty);
+  const [mode, setMode] = useState(() =>
+    song.rap_mode_available ? loadMode(song.id) : DEFAULT_MODE,
+  );
   const latencyMs = loadLatency();
   const session = usePlaySession(song);
   const karaoke = useKaraoke(song, session.sendLine, () => void session.finish());
@@ -64,7 +69,7 @@ function Karaoke({ song }: { song: SongDetail }) {
     const name = normalizePlayerName(playerName);
     savePlayerName(name);
     setPlayerName(name);
-    if (!(await session.start(name, latencyMs ?? 0, difficulty))) return;
+    if (!(await session.start(name, latencyMs ?? 0, difficulty, mode))) return;
     if (!(await karaoke.play())) session.close();
   };
 
@@ -130,6 +135,14 @@ function Karaoke({ song }: { song: SongDetail }) {
               ))}
             </select>
           </label>
+          <ModeSelect
+            value={mode}
+            rapAvailable={song.rap_mode_available}
+            onChange={(next) => {
+              setMode(next);
+              saveMode(song.id, next);
+            }}
+          />
           <p className="muted">
             {latencyMs === null ? (
               <>

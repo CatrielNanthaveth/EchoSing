@@ -42,6 +42,7 @@ const CREATED: SessionCreated = {
   player_name: "Ana",
   latency_offset_ms: 120,
   difficulty: "normal",
+  mode: "melody",
 };
 
 let sources: FakeSource[] = [];
@@ -155,6 +156,7 @@ describe("SongPage", () => {
       player_name: "Ana",
       latency_offset_ms: 120,
       difficulty: "easy",
+      mode: "melody",
     });
     expect(localStorage.getItem("echosing.difficulty")).toBe("easy");
     expect(FakeSocket.instances[0]?.url).toBe(
@@ -327,5 +329,33 @@ describe("SongPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Chachacha" })).toBeVisible();
     expect(getSong).toHaveBeenCalledTimes(2);
+  });
+
+  it("offers rap mode only when the song supports it", async () => {
+    renderSong();
+
+    const mode = await screen.findByRole("combobox", { name: "Modo" });
+    expect(mode).toHaveValue("melody");
+    expect(screen.getByRole("option", { name: /Rap/ })).toBeDisabled();
+  });
+
+  it("sings in rap mode, remembered for the song", async () => {
+    vi.spyOn(api, "getSong").mockResolvedValue(
+      songDetail({ rap_mode_available: true }),
+    );
+    const user = userEvent.setup();
+    renderSong();
+
+    await user.selectOptions(
+      await screen.findByRole("combobox", { name: "Modo" }),
+      "rhythm",
+    );
+    await user.click(screen.getByRole("button", { name: "Cantar" }));
+
+    await screen.findByRole("button", { name: "Detener" });
+    expect(createSession).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: "rhythm" }),
+    );
+    expect(localStorage.getItem("echosing.mode.song-1")).toBe("rhythm");
   });
 });

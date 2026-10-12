@@ -1,4 +1,4 @@
-import type { LineAnalysis, LyricLine } from "../api/types";
+import type { LineScoring, LyricLine } from "../api/types";
 import type { Microphone } from "../audio/microphone";
 import type { Playback } from "../audio/playback";
 import { LINE_TAIL_MS, LineCollector, levelDb, type SungLine } from "./lineCollector";
@@ -14,7 +14,7 @@ export type LoopPhase =
   | { name: "idle" }
   | { name: "playing"; attempt: number }
   | { name: "scoring"; attempt: number }
-  | { name: "result"; attempt: number; analysis: LineAnalysis }
+  | { name: "result"; attempt: number; analysis: LineScoring }
   | { name: "error"; message: string };
 
 export interface PracticeLoopDeps {
@@ -23,10 +23,10 @@ export interface PracticeLoopDeps {
   /** Time between microphone frames (ms). */
   hopMs: number;
   /** Score one attempt (the server analyzes it). */
-  score: (sung: SungLine) => Promise<LineAnalysis>;
+  score: (sung: SungLine) => Promise<LineScoring>;
   onPhase: (phase: LoopPhase) => void;
   /** Every microphone frame while singing, on the song timeline (live chart). */
-  onVoice?: (songMs: number, f0: number) => void;
+  onVoice?: (songMs: number, f0: number, db: number) => void;
   /**
    * Called when an attempt starts playing, with the AudioContext time of the
    * line start (e.g. to play a guide melody); may return a cleanup.
@@ -99,8 +99,9 @@ export class PracticeLoop {
     this.#unsubscribe = microphone.subscribe((frame) => {
       const songMs = playback.songTimeAt(frame.time);
       if (songMs < line.start_ms - COUNT_IN_MS) return;
-      collector.add(songMs, frame.f0, levelDb(frame.rms));
-      onVoice?.(songMs, frame.f0);
+      const db = levelDb(frame.rms);
+      collector.add(songMs, frame.f0, db);
+      onVoice?.(songMs, frame.f0, db);
     });
 
     const fromMs = Math.max(0, line.start_ms - COUNT_IN_MS);

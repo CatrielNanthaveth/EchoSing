@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { LineAnalysis } from "../api/types";
+import type { LineScoring } from "../api/types";
 import type { FrameListener, Microphone } from "../audio/microphone";
 import type { Playback } from "../audio/playback";
-import { lineAnalysis, lyricLine } from "../test/factories";
+import { lineScoring, lyricLine } from "../test/factories";
 import type { SungLine } from "./lineCollector";
 import { COUNT_IN_MS, PAUSE_MS, PracticeLoop, type LoopPhase } from "./practiceLoop";
 
@@ -11,8 +11,8 @@ const LINE = lyricLine(3, 10_000, 11_000, "Hola mundo");
 const HOP = 10;
 
 function setup(
-  score = vi.fn<(sung: SungLine) => Promise<LineAnalysis>>(() =>
-    Promise.resolve(lineAnalysis()),
+  score = vi.fn<(sung: SungLine) => Promise<LineScoring>>(() =>
+    Promise.resolve(lineScoring()),
   ),
 ) {
   const listeners = new Set<FrameListener>();
@@ -135,10 +135,10 @@ describe("PracticeLoop", () => {
   });
 
   it("stops: no more frames, results or repetitions", async () => {
-    let resolve: (analysis: ReturnType<typeof lineAnalysis>) => void = () => undefined;
+    let resolve: (analysis: ReturnType<typeof lineScoring>) => void = () => undefined;
     const score = vi.fn(
       () =>
-        new Promise<ReturnType<typeof lineAnalysis>>((done) => {
+        new Promise<ReturnType<typeof lineScoring>>((done) => {
           resolve = done;
         }),
     );
@@ -147,7 +147,7 @@ describe("PracticeLoop", () => {
     sing(8000, 11_400);
 
     loop.stop();
-    resolve(lineAnalysis());
+    resolve(lineScoring());
     await vi.advanceTimersByTimeAsync(PAUSE_MS * 2);
 
     expect(loop.running).toBe(false);
@@ -182,7 +182,7 @@ describe("PracticeLoop", () => {
       } as unknown as Playback,
       microphone: { subscribe: () => () => undefined } as unknown as Microphone,
       hopMs: HOP,
-      score: () => Promise.resolve(lineAnalysis()),
+      score: () => Promise.resolve(lineScoring()),
       onPhase: () => undefined,
       onAttemptStart,
     });

@@ -265,13 +265,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LineAnalysis"
+                  "$ref": "#/components/schemas/LineScoring"
                 }
               }
             }
           },
           "404": {
             "description": "Song, analysis or line not found"
+          },
+          "409": {
+            "description": "Rap mode unavailable for the song"
           },
           "422": {
             "description": "Validation Error",
@@ -381,6 +384,9 @@
           },
           "404": {
             "description": "Song not available"
+          },
+          "409": {
+            "description": "Rap mode unavailable for the song"
           },
           "422": {
             "description": "Validation Error",
@@ -990,6 +996,30 @@
         "title": "JobReport",
         "description": "State of an ingestion job.\n\nAttributes:\n    id: Job id.\n    stage: Current or final stage.\n    task_id: Id of the queued task, if it was queued.\n    error_message: Failure reason, if it failed.\n    created_at: When the job was created.\n    started_at: When processing started.\n    finished_at: When it finished, successfully or not."
       },
+      "LevelCurve": {
+        "properties": {
+          "hop_ms": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Hop Ms"
+          },
+          "db": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Db"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "hop_ms",
+          "db"
+        ],
+        "title": "LevelCurve",
+        "description": "Loudness of the isolated vocals; frame ``i`` is centered at ``i * hop_ms``.\n\nRap mode finds syllable attacks in it: unlike pitch, it also rises on\nunvoiced consonants (\"t\", \"k\", \"ch\").\n\nAttributes:\n    hop_ms: Time between consecutive frames.\n    db: RMS level per frame in dBFS, rounded to 0.1, floored at -90."
+      },
       "LineAnalysis": {
         "properties": {
           "result": {
@@ -1173,6 +1203,10 @@
           "difficulty": {
             "$ref": "#/components/schemas/Difficulty",
             "default": "normal"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ScoringMode",
+            "default": "melody"
           }
         },
         "type": "object",
@@ -1182,7 +1216,7 @@
           "f0_hz"
         ],
         "title": "LineAttempt",
-        "description": "A practice attempt at one line, scored but not stored.\n\nAttributes:\n    analysis_id: Analysis whose lines and pitch the client is using.\n    hop_ms: Time between pitch frames.\n    f0_hz: Pitch per frame in Hz from the line start (0 = no voice), as in\n        the ``line_pitch`` message (send ~300 ms past the line end).\n    level_db: Optional microphone level per frame (dBFS), as in\n        ``line_pitch``.\n    latency_offset_ms: Latency measured by the client's calibration.\n    difficulty: Pitch tolerance."
+        "description": "A practice attempt at one line, scored but not stored.\n\nAttributes:\n    analysis_id: Analysis whose lines and pitch the client is using.\n    hop_ms: Time between pitch frames.\n    f0_hz: Pitch per frame in Hz from the line start (0 = no voice), as in\n        the ``line_pitch`` message (send ~300 ms past the line end).\n    level_db: Optional microphone level per frame (dBFS), as in\n        ``line_pitch``.\n    latency_offset_ms: Latency measured by the client's calibration.\n    difficulty: Pitch (or timing) tolerance.\n    mode: What is scored; ``rhythm`` needs ``level_db``."
       },
       "LineDiagnostics": {
         "properties": {
@@ -1210,6 +1244,9 @@
           "difficulty": {
             "$ref": "#/components/schemas/Difficulty"
           },
+          "mode": {
+            "$ref": "#/components/schemas/ScoringMode"
+          },
           "words": {
             "items": {
               "$ref": "#/components/schemas/PracticeWord"
@@ -1236,12 +1273,25 @@
               }
             ]
           },
+          "rhythm": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RhythmAnalysis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "latency_ms": {
             "type": "integer",
             "title": "Latency Ms"
           },
           "scoring": {
             "$ref": "#/components/schemas/ScoringConfig"
+          },
+          "rhythm_scoring": {
+            "$ref": "#/components/schemas/RhythmConfig"
           },
           "analysis_version": {
             "type": "integer",
@@ -1252,6 +1302,16 @@
           },
           "reference": {
             "$ref": "#/components/schemas/PitchCurve"
+          },
+          "reference_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LevelCurve"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "sung_input": {
             "anyOf": [
@@ -1279,19 +1339,23 @@
           "start_ms",
           "end_ms",
           "difficulty",
+          "mode",
           "words",
           "status",
           "analysis",
+          "rhythm",
           "latency_ms",
           "scoring",
+          "rhythm_scoring",
           "analysis_version",
           "pipeline",
           "reference",
+          "reference_level",
           "sung_input",
           "word_timing"
         ],
         "title": "LineDiagnostics",
-        "description": "Everything behind a line score, for admins debugging sync and scoring.\n\nAttributes:\n    latency_ms: Latency compensated for the session.\n    scoring: Exact scoring parameters used (difficulty included).\n    analysis_version: Version of the song analysis the session uses.\n    pipeline: Models that produced that analysis.\n    reference: Reference pitch of the line at its native resolution\n        (frame 0 at ``start_ms``).\n    sung_input: Pitch exactly as the client sent it, None if not stored.\n    word_timing: Words with their voicing and transcriber confidence."
+        "description": "Everything behind a line score, for admins debugging sync and scoring.\n\nAttributes:\n    latency_ms: Latency compensated for the session.\n    scoring: Exact pitch scoring parameters (difficulty included).\n    rhythm_scoring: Exact rhythm scoring parameters (rap mode).\n    analysis_version: Version of the song analysis the session uses.\n    pipeline: Models that produced that analysis.\n    reference: Reference pitch of the line at its native resolution\n        (frame 0 at ``start_ms``).\n    reference_level: Loudness of the reference vocals over the line, if\n        the analysis has it.\n    sung_input: Pitch exactly as the client sent it, None if not stored.\n    word_timing: Words with their voicing and transcriber confidence."
       },
       "LinePractice": {
         "properties": {
@@ -1319,6 +1383,9 @@
           "difficulty": {
             "$ref": "#/components/schemas/Difficulty"
           },
+          "mode": {
+            "$ref": "#/components/schemas/ScoringMode"
+          },
           "words": {
             "items": {
               "$ref": "#/components/schemas/PracticeWord"
@@ -1344,6 +1411,16 @@
                 "type": "null"
               }
             ]
+          },
+          "rhythm": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RhythmAnalysis"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -1354,12 +1431,14 @@
           "start_ms",
           "end_ms",
           "difficulty",
+          "mode",
           "words",
           "status",
-          "analysis"
+          "analysis",
+          "rhythm"
         ],
         "title": "LinePractice",
-        "description": "How the player sang one line, for the practice chart.\n\nAttributes:\n    session_id: Session.\n    line_index: Line.\n    text: Line text.\n    start_ms: Line start in the song.\n    end_ms: Line end in the song.\n    difficulty: Pitch tolerance the line was scored with.\n    words: Words of the line.\n    status: Whether there is an analysis (see ``AnalysisStatus``).\n    analysis: Curves, alignment and offsets; None unless ``analyzed``."
+        "description": "How the player sang one line, for the practice chart.\n\nAttributes:\n    session_id: Session.\n    line_index: Line.\n    text: Line text.\n    start_ms: Line start in the song.\n    end_ms: Line end in the song.\n    difficulty: Tolerance the line was scored with.\n    mode: What the session scores.\n    words: Words of the line.\n    status: Whether there is an analysis (see ``AnalysisStatus``).\n    analysis: Melody mode: curves, alignment and offsets; None unless\n        ``analyzed``.\n    rhythm: Rap mode: attacks and their timing; None unless ``analyzed``."
       },
       "LineReport": {
         "properties": {
@@ -1474,6 +1553,41 @@
         "title": "LineResult",
         "description": "Score of one sung line.\n\nAttributes:\n    scorable: False when the reference has too little singing to judge.\n    score: Weighted pitch score in [0, 100], None if not scorable.\n    accuracy: Fraction of reference frames sung within full credit, in\n        [0, 1], None if not scorable.\n    hit: Whether the score reaches the hit threshold.\n    voiced_frames: Sung reference frames, used to weight session totals."
       },
+      "LineScoring": {
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/ScoringMode"
+          },
+          "analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LineAnalysis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rhythm": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RhythmAnalysis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "analysis",
+          "rhythm"
+        ],
+        "title": "LineScoring",
+        "description": "A sung line scored and explained in its mode.\n\nAttributes:\n    mode: What was scored.\n    analysis: Melody mode: pitch curves, alignment and offsets.\n    rhythm: Rap mode: syllable attacks, pairs and timing offset."
+      },
       "LyricLine": {
         "properties": {
           "index": {
@@ -1551,6 +1665,35 @@
         ],
         "title": "LyricsUpdate",
         "description": "Official lyrics submitted for a song.\n\nAttributes:\n    lyrics: Plain text, one verse per line. Empty lines, ``[Section]``\n        labels and lines fully in parentheses are ignored."
+      },
+      "OnsetPair": {
+        "properties": {
+          "reference": {
+            "type": "integer",
+            "title": "Reference"
+          },
+          "sung": {
+            "type": "integer",
+            "title": "Sung"
+          },
+          "offset_ms": {
+            "type": "number",
+            "title": "Offset Ms"
+          },
+          "credit": {
+            "type": "number",
+            "title": "Credit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reference",
+          "sung",
+          "offset_ms",
+          "credit"
+        ],
+        "title": "OnsetPair",
+        "description": "A reference attack and the sung attack matched to it.\n\nAttributes:\n    reference: Index of the reference attack.\n    sung: Index of the sung attack.\n    offset_ms: Sung minus reference time (positive: late).\n    credit: Credit of the pair, 0-1."
       },
       "PipelineInfo": {
         "properties": {
@@ -1673,6 +1816,20 @@
             },
             "type": "array",
             "title": "Confidence"
+          },
+          "level_db": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Db"
           }
         },
         "type": "object",
@@ -1685,7 +1842,7 @@
           "confidence"
         ],
         "title": "PitchResponse",
-        "description": "Reference pitch of a song, or of one of its lines.\n\nAttributes:\n    analysis_id: Id of the analysis the curve belongs to.\n    line_index: The requested line, or None for the whole song.\n    start_ms: Time of the first frame returned.\n    hop_ms: Time between frames.\n    midi: Pitch per frame as fractional MIDI note; None without estimate.\n    confidence: Voicing confidence per frame, 0-100."
+        "description": "Reference pitch of a song, or of one of its lines.\n\nAttributes:\n    analysis_id: Id of the analysis the curve belongs to.\n    line_index: The requested line, or None for the whole song.\n    start_ms: Time of the first frame returned.\n    hop_ms: Time between frames.\n    midi: Pitch per frame as fractional MIDI note; None without estimate.\n    confidence: Voicing confidence per frame, 0-100.\n    level_db: Loudness of the reference vocals per frame (dBFS), same\n        frames; None when the analysis has no level (rap mode needs it)."
       },
       "PlaySessionStatus": {
         "type": "string",
@@ -1719,6 +1876,127 @@
         ],
         "title": "PracticeWord",
         "description": "A lyric word, timed from the line start.\n\nAttributes:\n    text: Word as displayed.\n    start_ms: Start, relative to the line start.\n    end_ms: End, relative to the line start."
+      },
+      "RhythmAnalysis": {
+        "properties": {
+          "result": {
+            "$ref": "#/components/schemas/LineResult"
+          },
+          "reference_onsets_ms": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Reference Onsets Ms"
+          },
+          "sung_onsets_ms": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Sung Onsets Ms"
+          },
+          "pairs": {
+            "items": {
+              "$ref": "#/components/schemas/OnsetPair"
+            },
+            "type": "array",
+            "title": "Pairs"
+          },
+          "missed": {
+            "type": "integer",
+            "title": "Missed"
+          },
+          "extra": {
+            "type": "integer",
+            "title": "Extra"
+          },
+          "timing_offset_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timing Offset Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "result",
+          "reference_onsets_ms",
+          "sung_onsets_ms",
+          "pairs",
+          "missed",
+          "extra",
+          "timing_offset_ms"
+        ],
+        "title": "RhythmAnalysis",
+        "description": "A line scored by rhythm, explained attack by attack.\n\nTimes are in ms from the line start (the sung ones with latency undone).\n\nAttributes:\n    result: The line score.\n    reference_onsets_ms: Syllable attacks of the original.\n    sung_onsets_ms: Syllable attacks of the singer (up to the matching\n        reach past the line end).\n    pairs: Matched attacks, in order.\n    missed: Reference attacks with no sung match.\n    extra: Sung attacks inside the line with no reference match.\n    timing_offset_ms: Median offset of the pairs (positive: late), None\n        without pairs."
+      },
+      "RhythmConfig": {
+        "properties": {
+          "rise_db": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Rise Db",
+            "default": 6.0
+          },
+          "rise_window_ms": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Rise Window Ms",
+            "default": 50.0
+          },
+          "floor_below_peak_db": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Floor Below Peak Db",
+            "default": 30.0
+          },
+          "absolute_floor_db": {
+            "type": "number",
+            "maximum": 0.0,
+            "title": "Absolute Floor Db",
+            "default": -55.0
+          },
+          "refractory_ms": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Refractory Ms",
+            "default": 100.0
+          },
+          "full_credit_ms": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Full Credit Ms",
+            "default": 40.0
+          },
+          "zero_credit_ms": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Zero Credit Ms",
+            "default": 100.0
+          },
+          "min_onsets": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Min Onsets",
+            "default": 3
+          },
+          "hit_threshold": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Hit Threshold",
+            "default": 60.0
+          }
+        },
+        "type": "object",
+        "title": "RhythmConfig",
+        "description": "Tunable parameters of rhythm scoring.\n\nDetector defaults were chosen on the reference vocals of real songs: ~0.8\nattacks per sung syllable (merged syllables have no dip), 170-210 ms apart\nin rap.\n\nAttributes:\n    rise_db: An attack rises at least this much over the quietest level\n        of the preceding ``rise_window_ms``.\n    rise_window_ms: Window the rise is measured against.\n    floor_below_peak_db: Attacks must reach the line's loudest level minus\n        this (independent of the microphone gain).\n    absolute_floor_db: ...and at least this level (silence is no attack).\n    refractory_ms: Minimum time between attacks.\n    full_credit_ms: Attacks off by up to this get full credit.\n    zero_credit_ms: Attacks off by this or more get none; also the farthest\n        two attacks can be paired.\n    min_onsets: Lines with fewer reference attacks are not scorable.\n    hit_threshold: Line score from which the line counts as a hit."
       },
       "ScoringConfig": {
         "properties": {
@@ -1801,6 +2079,15 @@
         "title": "ScoringConfig",
         "description": "Tunable parameters of line scoring.\n\nAttributes:\n    scoring_hop_ms: Frame period used to compare curves. Notes last at\n        least ~100 ms, so 20 ms loses nothing for intonation and keeps DTW\n        fast enough for real-time feedback.\n    min_reference_confidence: Reference frames below this confidence\n        (0-100) are not sung and not scored.\n    min_voiced_ms: Lines with less sung reference than this (e.g. spoken\n        passages) are not scorable.\n    full_credit_semitones: Errors up to this get full credit (0.5 = 50\n        cents, a quarter tone).\n    zero_credit_semitones: Errors from this up get no credit; credit\n        decreases linearly in between.\n    max_error_semitones: Cap of the frame error; also the cost of a sung\n        frame without voice.\n    max_gap_ms: Unvoiced gaps of the sung curve up to this long, between\n        voiced frames, are bridged before scoring: real-time detection\n        drops frames inside notes, while the reference is smoothed.\n    octave_invariant: Whether singing an octave above or below is right.\n    max_warp_ms: How far (in time) the alignment may drift from the\n        diagonal: enough to enter late or hold a note, not enough to match\n        a neighboring note (None for no limit).\n    step_penalty_semitones: Cost of each non-diagonal alignment step. It\n        stops DTW from \"rewarding\" off-key singing by matching it to other\n        reference notes of the same height (without it, singing 1.5\n        semitones off scores 58 instead of 33). 2.0 gives the theoretical\n        scores for detuned singing while keeping late entries (150 ms ->\n        100) and rhythm variations (+-100 ms -> ~97) almost unpenalized.\n    hit_threshold: Line score from which the line counts as a hit."
       },
+      "ScoringMode": {
+        "type": "string",
+        "enum": [
+          "melody",
+          "rhythm"
+        ],
+        "title": "ScoringMode",
+        "description": "What a play session scores.\n\nAttributes:\n    MELODY: Pitch: singing the notes of the melody.\n    RHYTHM: Rap: hitting the syllables on time, ignoring pitch."
+      },
       "SeparationPreset": {
         "type": "string",
         "enum": [
@@ -1833,6 +2120,10 @@
           "difficulty": {
             "$ref": "#/components/schemas/Difficulty",
             "default": "normal"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ScoringMode",
+            "default": "melody"
           }
         },
         "type": "object",
@@ -1841,7 +2132,7 @@
           "player_name"
         ],
         "title": "SessionCreate",
-        "description": "Request to start singing a song.\n\nAttributes:\n    song_id: Song to sing (must be playable).\n    player_name: Display name of the anonymous player.\n    latency_offset_ms: Audio latency measured by the client's calibration;\n        positive when the voice arrives late.\n    difficulty: Pitch tolerance of the scoring."
+        "description": "Request to start singing a song.\n\nAttributes:\n    song_id: Song to sing (must be playable).\n    player_name: Display name of the anonymous player.\n    latency_offset_ms: Audio latency measured by the client's calibration;\n        positive when the voice arrives late.\n    difficulty: Pitch (or timing) tolerance of the scoring.\n    mode: What is scored: ``melody`` (pitch) or ``rhythm`` (rap: timing of\n        the syllables, ignoring pitch; needs the client's ``level_db``)."
       },
       "SessionCreated": {
         "properties": {
@@ -1878,6 +2169,9 @@
           },
           "difficulty": {
             "$ref": "#/components/schemas/Difficulty"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ScoringMode"
           }
         },
         "type": "object",
@@ -1889,10 +2183,11 @@
           "line_count",
           "player_name",
           "latency_offset_ms",
-          "difficulty"
+          "difficulty",
+          "mode"
         ],
         "title": "SessionCreated",
-        "description": "A started play session.\n\nAttributes:\n    session_id: Id of the session (used by the WebSocket).\n    song_id: Song being sung.\n    analysis_id: Analysis version the session is scored against.\n    analysis_version: Version number of that analysis.\n    line_count: Number of lyric lines to sing.\n    player_name: Display name of the player.\n    latency_offset_ms: Latency applied when scoring.\n    difficulty: Pitch tolerance of the scoring."
+        "description": "A started play session.\n\nAttributes:\n    session_id: Id of the session (used by the WebSocket).\n    song_id: Song being sung.\n    analysis_id: Analysis version the session is scored against.\n    analysis_version: Version number of that analysis.\n    line_count: Number of lyric lines to sing.\n    player_name: Display name of the player.\n    latency_offset_ms: Latency applied when scoring.\n    difficulty: Pitch (or timing) tolerance of the scoring.\n    mode: What is scored."
       },
       "SessionResults": {
         "properties": {
@@ -1917,6 +2212,9 @@
           },
           "difficulty": {
             "$ref": "#/components/schemas/Difficulty"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ScoringMode"
           },
           "status": {
             "$ref": "#/components/schemas/PlaySessionStatus"
@@ -1956,6 +2254,7 @@
           "analysis_id",
           "player_name",
           "difficulty",
+          "mode",
           "status",
           "started_at",
           "finished_at",
@@ -1963,7 +2262,7 @@
           "lines"
         ],
         "title": "SessionResults",
-        "description": "Report of a play session.\n\nAttributes:\n    session_id: Session id.\n    song_id: Song sung.\n    analysis_id: Analysis the session was scored against.\n    player_name: Display name of the player.\n    difficulty: Pitch tolerance the session is scored with.\n    status: ``active`` or ``finished``.\n    started_at: When the session started.\n    finished_at: When it finished, if it did.\n    totals: Totals over the lines scored so far (all lines once finished).\n    lines: One entry per lyric line, in order."
+        "description": "Report of a play session.\n\nAttributes:\n    session_id: Session id.\n    song_id: Song sung.\n    analysis_id: Analysis the session was scored against.\n    player_name: Display name of the player.\n    difficulty: Tolerance the session is scored with.\n    mode: What the session scores.\n    status: ``active`` or ``finished``.\n    started_at: When the session started.\n    finished_at: When it finished, if it did.\n    totals: Totals over the lines scored so far (all lines once finished).\n    lines: One entry per lyric line, in order."
       },
       "SessionTotals": {
         "properties": {
@@ -2067,6 +2366,10 @@
             "type": "integer",
             "title": "Analysis Version"
           },
+          "rap_mode_available": {
+            "type": "boolean",
+            "title": "Rap Mode Available"
+          },
           "lines": {
             "items": {
               "$ref": "#/components/schemas/LyricLine"
@@ -2086,10 +2389,11 @@
           "reprocessing",
           "analysis_id",
           "analysis_version",
+          "rap_mode_available",
           "lines"
         ],
         "title": "SongDetail",
-        "description": "A playable song with its synced lyrics.\n\nAttributes:\n    analysis_id: Id of the current analysis; play sessions are bound to it.\n    analysis_version: Version number of the current analysis.\n    lines: Lyric lines with timed words (the pitch curve is served apart)."
+        "description": "A playable song with its synced lyrics.\n\nAttributes:\n    analysis_id: Id of the current analysis; play sessions are bound to it.\n    analysis_version: Version number of the current analysis.\n    rap_mode_available: Whether the analysis has the vocals' level that\n        rap mode (rhythm scoring) needs.\n    lines: Lyric lines with timed words (the pitch curve is served apart)."
       },
       "SongPage": {
         "properties": {

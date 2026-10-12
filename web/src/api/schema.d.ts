@@ -366,6 +366,23 @@ export interface components {
             finished_at: string | null;
         };
         /**
+         * LevelCurve
+         * @description Loudness of the isolated vocals; frame ``i`` is centered at ``i * hop_ms``.
+         *
+         *     Rap mode finds syllable attacks in it: unlike pitch, it also rises on
+         *     unvoiced consonants ("t", "k", "ch").
+         *
+         *     Attributes:
+         *         hop_ms: Time between consecutive frames.
+         *         db: RMS level per frame in dBFS, rounded to 0.1, floored at -90.
+         */
+        LevelCurve: {
+            /** Hop Ms */
+            hop_ms: number;
+            /** Db */
+            db: number[];
+        };
+        /**
          * LineAnalysis
          * @description A sung line explained frame by frame, on the scoring timeline.
          *
@@ -429,7 +446,8 @@ export interface components {
          *         level_db: Optional microphone level per frame (dBFS), as in
          *             ``line_pitch``.
          *         latency_offset_ms: Latency measured by the client's calibration.
-         *         difficulty: Pitch tolerance.
+         *         difficulty: Pitch (or timing) tolerance.
+         *         mode: What is scored; ``rhythm`` needs ``level_db``.
          */
         LineAttempt: {
             /**
@@ -450,6 +468,8 @@ export interface components {
             latency_offset_ms: number;
             /** @default normal */
             difficulty: components["schemas"]["Difficulty"];
+            /** @default melody */
+            mode: components["schemas"]["ScoringMode"];
         };
         /**
          * LineDiagnostics
@@ -457,11 +477,14 @@ export interface components {
          *
          *     Attributes:
          *         latency_ms: Latency compensated for the session.
-         *         scoring: Exact scoring parameters used (difficulty included).
+         *         scoring: Exact pitch scoring parameters (difficulty included).
+         *         rhythm_scoring: Exact rhythm scoring parameters (rap mode).
          *         analysis_version: Version of the song analysis the session uses.
          *         pipeline: Models that produced that analysis.
          *         reference: Reference pitch of the line at its native resolution
          *             (frame 0 at ``start_ms``).
+         *         reference_level: Loudness of the reference vocals over the line, if
+         *             the analysis has it.
          *         sung_input: Pitch exactly as the client sent it, None if not stored.
          *         word_timing: Words with their voicing and transcriber confidence.
          */
@@ -480,6 +503,7 @@ export interface components {
             /** End Ms */
             end_ms: number;
             difficulty: components["schemas"]["Difficulty"];
+            mode: components["schemas"]["ScoringMode"];
             /** Words */
             words: components["schemas"]["PracticeWord"][];
             /**
@@ -488,13 +512,16 @@ export interface components {
              */
             status: "analyzed" | "not_sung" | "not_stored";
             analysis: components["schemas"]["LineAnalysis"] | null;
+            rhythm: components["schemas"]["RhythmAnalysis"] | null;
             /** Latency Ms */
             latency_ms: number;
             scoring: components["schemas"]["ScoringConfig"];
+            rhythm_scoring: components["schemas"]["RhythmConfig"];
             /** Analysis Version */
             analysis_version: number;
             pipeline: components["schemas"]["PipelineInfo"];
             reference: components["schemas"]["PitchCurve"];
+            reference_level: components["schemas"]["LevelCurve"] | null;
             sung_input: components["schemas"]["SungPitch"] | null;
             /** Word Timing */
             word_timing: components["schemas"]["WordDiagnostics"][];
@@ -509,10 +536,13 @@ export interface components {
          *         text: Line text.
          *         start_ms: Line start in the song.
          *         end_ms: Line end in the song.
-         *         difficulty: Pitch tolerance the line was scored with.
+         *         difficulty: Tolerance the line was scored with.
+         *         mode: What the session scores.
          *         words: Words of the line.
          *         status: Whether there is an analysis (see ``AnalysisStatus``).
-         *         analysis: Curves, alignment and offsets; None unless ``analyzed``.
+         *         analysis: Melody mode: curves, alignment and offsets; None unless
+         *             ``analyzed``.
+         *         rhythm: Rap mode: attacks and their timing; None unless ``analyzed``.
          */
         LinePractice: {
             /**
@@ -529,6 +559,7 @@ export interface components {
             /** End Ms */
             end_ms: number;
             difficulty: components["schemas"]["Difficulty"];
+            mode: components["schemas"]["ScoringMode"];
             /** Words */
             words: components["schemas"]["PracticeWord"][];
             /**
@@ -537,6 +568,7 @@ export interface components {
              */
             status: "analyzed" | "not_sung" | "not_stored";
             analysis: components["schemas"]["LineAnalysis"] | null;
+            rhythm: components["schemas"]["RhythmAnalysis"] | null;
         };
         /**
          * LineReport
@@ -592,6 +624,20 @@ export interface components {
             voiced_frames: number;
         };
         /**
+         * LineScoring
+         * @description A sung line scored and explained in its mode.
+         *
+         *     Attributes:
+         *         mode: What was scored.
+         *         analysis: Melody mode: pitch curves, alignment and offsets.
+         *         rhythm: Rap mode: syllable attacks, pairs and timing offset.
+         */
+        LineScoring: {
+            mode: components["schemas"]["ScoringMode"];
+            analysis: components["schemas"]["LineAnalysis"] | null;
+            rhythm: components["schemas"]["RhythmAnalysis"] | null;
+        };
+        /**
          * LyricLine
          * @description A line (verse) of lyrics, the unit that gets scored.
          *
@@ -642,6 +688,26 @@ export interface components {
         LyricsUpdate: {
             /** Lyrics */
             lyrics: string;
+        };
+        /**
+         * OnsetPair
+         * @description A reference attack and the sung attack matched to it.
+         *
+         *     Attributes:
+         *         reference: Index of the reference attack.
+         *         sung: Index of the sung attack.
+         *         offset_ms: Sung minus reference time (positive: late).
+         *         credit: Credit of the pair, 0-1.
+         */
+        OnsetPair: {
+            /** Reference */
+            reference: number;
+            /** Sung */
+            sung: number;
+            /** Offset Ms */
+            offset_ms: number;
+            /** Credit */
+            credit: number;
         };
         /**
          * PipelineInfo
@@ -695,6 +761,8 @@ export interface components {
          *         hop_ms: Time between frames.
          *         midi: Pitch per frame as fractional MIDI note; None without estimate.
          *         confidence: Voicing confidence per frame, 0-100.
+         *         level_db: Loudness of the reference vocals per frame (dBFS), same
+         *             frames; None when the analysis has no level (rap mode needs it).
          */
         PitchResponse: {
             /**
@@ -712,6 +780,8 @@ export interface components {
             midi: (number | null)[];
             /** Confidence */
             confidence: number[];
+            /** Level Db */
+            level_db?: number[] | null;
         };
         /**
          * PlaySessionStatus
@@ -735,6 +805,107 @@ export interface components {
             start_ms: number;
             /** End Ms */
             end_ms: number;
+        };
+        /**
+         * RhythmAnalysis
+         * @description A line scored by rhythm, explained attack by attack.
+         *
+         *     Times are in ms from the line start (the sung ones with latency undone).
+         *
+         *     Attributes:
+         *         result: The line score.
+         *         reference_onsets_ms: Syllable attacks of the original.
+         *         sung_onsets_ms: Syllable attacks of the singer (up to the matching
+         *             reach past the line end).
+         *         pairs: Matched attacks, in order.
+         *         missed: Reference attacks with no sung match.
+         *         extra: Sung attacks inside the line with no reference match.
+         *         timing_offset_ms: Median offset of the pairs (positive: late), None
+         *             without pairs.
+         */
+        RhythmAnalysis: {
+            result: components["schemas"]["LineResult"];
+            /** Reference Onsets Ms */
+            reference_onsets_ms: number[];
+            /** Sung Onsets Ms */
+            sung_onsets_ms: number[];
+            /** Pairs */
+            pairs: components["schemas"]["OnsetPair"][];
+            /** Missed */
+            missed: number;
+            /** Extra */
+            extra: number;
+            /** Timing Offset Ms */
+            timing_offset_ms: number | null;
+        };
+        /**
+         * RhythmConfig
+         * @description Tunable parameters of rhythm scoring.
+         *
+         *     Detector defaults were chosen on the reference vocals of real songs: ~0.8
+         *     attacks per sung syllable (merged syllables have no dip), 170-210 ms apart
+         *     in rap.
+         *
+         *     Attributes:
+         *         rise_db: An attack rises at least this much over the quietest level
+         *             of the preceding ``rise_window_ms``.
+         *         rise_window_ms: Window the rise is measured against.
+         *         floor_below_peak_db: Attacks must reach the line's loudest level minus
+         *             this (independent of the microphone gain).
+         *         absolute_floor_db: ...and at least this level (silence is no attack).
+         *         refractory_ms: Minimum time between attacks.
+         *         full_credit_ms: Attacks off by up to this get full credit.
+         *         zero_credit_ms: Attacks off by this or more get none; also the farthest
+         *             two attacks can be paired.
+         *         min_onsets: Lines with fewer reference attacks are not scorable.
+         *         hit_threshold: Line score from which the line counts as a hit.
+         */
+        RhythmConfig: {
+            /**
+             * Rise Db
+             * @default 6
+             */
+            rise_db: number;
+            /**
+             * Rise Window Ms
+             * @default 50
+             */
+            rise_window_ms: number;
+            /**
+             * Floor Below Peak Db
+             * @default 30
+             */
+            floor_below_peak_db: number;
+            /**
+             * Absolute Floor Db
+             * @default -55
+             */
+            absolute_floor_db: number;
+            /**
+             * Refractory Ms
+             * @default 100
+             */
+            refractory_ms: number;
+            /**
+             * Full Credit Ms
+             * @default 40
+             */
+            full_credit_ms: number;
+            /**
+             * Zero Credit Ms
+             * @default 100
+             */
+            zero_credit_ms: number;
+            /**
+             * Min Onsets
+             * @default 3
+             */
+            min_onsets: number;
+            /**
+             * Hit Threshold
+             * @default 60
+             */
+            hit_threshold: number;
         };
         /**
          * ScoringConfig
@@ -827,6 +998,16 @@ export interface components {
             hit_threshold: number;
         };
         /**
+         * ScoringMode
+         * @description What a play session scores.
+         *
+         *     Attributes:
+         *         MELODY: Pitch: singing the notes of the melody.
+         *         RHYTHM: Rap: hitting the syllables on time, ignoring pitch.
+         * @enum {string}
+         */
+        ScoringMode: "melody" | "rhythm";
+        /**
          * SeparationPreset
          * @description Source separation configuration chosen for a song.
          *
@@ -846,7 +1027,9 @@ export interface components {
          *         player_name: Display name of the anonymous player.
          *         latency_offset_ms: Audio latency measured by the client's calibration;
          *             positive when the voice arrives late.
-         *         difficulty: Pitch tolerance of the scoring.
+         *         difficulty: Pitch (or timing) tolerance of the scoring.
+         *         mode: What is scored: ``melody`` (pitch) or ``rhythm`` (rap: timing of
+         *             the syllables, ignoring pitch; needs the client's ``level_db``).
          */
         SessionCreate: {
             /**
@@ -863,6 +1046,8 @@ export interface components {
             latency_offset_ms: number;
             /** @default normal */
             difficulty: components["schemas"]["Difficulty"];
+            /** @default melody */
+            mode: components["schemas"]["ScoringMode"];
         };
         /**
          * SessionCreated
@@ -876,7 +1061,8 @@ export interface components {
          *         line_count: Number of lyric lines to sing.
          *         player_name: Display name of the player.
          *         latency_offset_ms: Latency applied when scoring.
-         *         difficulty: Pitch tolerance of the scoring.
+         *         difficulty: Pitch (or timing) tolerance of the scoring.
+         *         mode: What is scored.
          */
         SessionCreated: {
             /**
@@ -903,6 +1089,7 @@ export interface components {
             /** Latency Offset Ms */
             latency_offset_ms: number;
             difficulty: components["schemas"]["Difficulty"];
+            mode: components["schemas"]["ScoringMode"];
         };
         /**
          * SessionResults
@@ -913,7 +1100,8 @@ export interface components {
          *         song_id: Song sung.
          *         analysis_id: Analysis the session was scored against.
          *         player_name: Display name of the player.
-         *         difficulty: Pitch tolerance the session is scored with.
+         *         difficulty: Tolerance the session is scored with.
+         *         mode: What the session scores.
          *         status: ``active`` or ``finished``.
          *         started_at: When the session started.
          *         finished_at: When it finished, if it did.
@@ -939,6 +1127,7 @@ export interface components {
             /** Player Name */
             player_name: string;
             difficulty: components["schemas"]["Difficulty"];
+            mode: components["schemas"]["ScoringMode"];
             status: components["schemas"]["PlaySessionStatus"];
             /**
              * Started At
@@ -981,6 +1170,8 @@ export interface components {
          *     Attributes:
          *         analysis_id: Id of the current analysis; play sessions are bound to it.
          *         analysis_version: Version number of the current analysis.
+         *         rap_mode_available: Whether the analysis has the vocals' level that
+         *             rap mode (rhythm scoring) needs.
          *         lines: Lyric lines with timed words (the pitch curve is served apart).
          */
         SongDetail: {
@@ -1008,6 +1199,8 @@ export interface components {
             analysis_id: string;
             /** Analysis Version */
             analysis_version: number;
+            /** Rap Mode Available */
+            rap_mode_available: boolean;
             /** Lines */
             lines: components["schemas"]["LyricLine"][];
         };
@@ -1551,11 +1744,18 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["LineAnalysis"];
+                    "application/json": components["schemas"]["LineScoring"];
                 };
             };
             /** @description Song, analysis or line not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Rap mode unavailable for the song */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1636,6 +1836,13 @@ export interface operations {
             };
             /** @description Song not available */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Rap mode unavailable for the song */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

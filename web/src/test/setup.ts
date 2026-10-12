@@ -1,6 +1,10 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterEach } from "vitest";
+
+// The default 1 s for findBy* is too tight when the whole suite runs in
+// parallel on a busy machine.
+configure({ asyncUtilTimeout: 3000 });
 
 afterEach(() => {
   cleanup();

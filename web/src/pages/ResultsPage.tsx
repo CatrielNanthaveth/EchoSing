@@ -6,6 +6,7 @@ import type { LineReport, SessionResults } from "../api/types";
 import { LinePracticePanel } from "../components/LinePracticePanel";
 import { useAsync } from "../hooks/useAsync";
 import { difficultyLabel } from "../settings/difficulty";
+import { modeLabel } from "../settings/mode";
 import { NotFoundPage } from "./NotFoundPage";
 
 interface Loaded {
@@ -51,7 +52,8 @@ export function ResultsPage() {
     <section className="results">
       <header>
         <p className="muted">
-          {results.player_name} · {difficultyLabel(results.difficulty)}
+          {results.player_name} · {modeLabel(results.mode)} ·{" "}
+          {difficultyLabel(results.difficulty)}
           {results.status === "active" && " · sesión sin terminar"}
         </p>
         <h1>{title ?? "Resultados"}</h1>

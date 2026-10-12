@@ -1,14 +1,24 @@
+import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
 import { ApiError, api } from "../api/client";
 import type { LyricLine, SongDetail } from "../api/types";
 import { AnalysisView } from "../components/LinePracticePanel";
+import { ModeSelect } from "../components/ModeSelect";
+import { RhythmView } from "../components/RhythmView";
 import { LivePitchCanvas } from "../components/LivePitchCanvas";
 import { useAsync } from "../hooks/useAsync";
 import { SERIES_COLORS } from "../lib/chartColors";
 import { usePractice } from "../session/usePractice";
 import { difficultyLabel, loadDifficulty } from "../settings/difficulty";
 import { loadLatency } from "../settings/latency";
+import {
+  DEFAULT_MODE,
+  loadMode,
+  modeLabel,
+  saveMode,
+  type ScoringMode,
+} from "../settings/mode";
 import { NotFoundPage } from "./NotFoundPage";
 
 export function PracticePage() {
@@ -40,20 +50,36 @@ function Practice({ song }: { song: SongDetail }) {
   const line = song.lines[lineIndex];
   const latencyMs = loadLatency() ?? 0;
   const difficulty = loadDifficulty();
-  const practice = usePractice(song, latencyMs, difficulty);
+  const [mode, setMode] = useState(() =>
+    song.rap_mode_available ? loadMode(song.id) : DEFAULT_MODE,
+  );
+  const practice = usePractice(song, latencyMs, difficulty, mode);
 
   const select = (index: number) => {
     practice.clear();
     setParams({ verso: String(index + 1) }, { replace: true });
   };
 
+  const changeMode = (next: ScoringMode) => {
+    practice.clear();
+    setMode(next);
+    saveMode(song.id, next);
+  };
+
   return (
     <section className="practice-page">
       <header className="karaoke-header">
         <div>
-          <p className="muted">Práctica · {difficultyLabel(difficulty)}</p>
+          <p className="muted">
+            Práctica · {modeLabel(mode)} · {difficultyLabel(difficulty)}
+          </p>
           <h1>{song.title}</h1>
           <p className="muted">{song.artist}</p>
+          <ModeSelect
+            value={mode}
+            rapAvailable={song.rap_mode_available}
+            onChange={changeMode}
+          />
         </div>
         <Link to={`/songs/${song.id}`}>Cantar la canción</Link>
       </header>
@@ -77,7 +103,13 @@ function Practice({ song }: { song: SongDetail }) {
           </ol>
         </nav>
         {line !== undefined && (
-          <LinePractice key={line.index} song={song} line={line} practice={practice} />
+          <LinePractice
+            key={`${String(line.index)}-${mode}`}
+            song={song}
+            line={line}
+            mode={mode}
+            practice={practice}
+          />
         )}
       </div>
     </section>
@@ -87,10 +119,12 @@ function Practice({ song }: { song: SongDetail }) {
 function LinePractice({
   song,
   line,
+  mode,
   practice,
 }: {
   song: SongDetail;
   line: LyricLine;
+  mode: ScoringMode;
   practice: ReturnType<typeof usePractice>;
 }) {
   const [reference, retry] = useAsync(
@@ -98,6 +132,11 @@ function LinePractice({
     [song.id, line.index],
   );
   const { phase, history, last } = practice;
+  const words = line.words.map((word) => ({
+    text: word.text,
+    start_ms: word.start_ms - line.start_ms,
+    end_ms: word.end_ms - line.start_ms,
+  }));
   const running =
     phase.name === "playing" || phase.name === "scoring" || phase.name === "result";
 
@@ -121,13 +160,14 @@ function LinePractice({
             reference={reference.data}
             voice={practice.voice}
             clock={practice.clock}
+            mode={mode}
           />
           <p className="live-legend" aria-hidden="true">
             <span
               className="chart-swatch"
               style={{ background: SERIES_COLORS.reference }}
             />
-            Melodía
+            {mode === "rhythm" ? "Original" : "Melodía"}
             <span
               className="chart-swatch"
               style={{ background: SERIES_COLORS.voice }}
@@ -195,16 +235,8 @@ function LinePractice({
         </p>
       )}
 
-      {last !== null && (
-        <AnalysisView
-          analysis={last}
-          words={line.words.map((word) => ({
-            text: word.text,
-            start_ms: word.start_ms - line.start_ms,
-            end_ms: word.end_ms - line.start_ms,
-          }))}
-        />
-      )}
+      {last?.analysis && <AnalysisView analysis={last.analysis} words={words} />}
+      {last?.rhythm && <RhythmView analysis={last.rhythm} words={words} />}
     </article>
   );
 }

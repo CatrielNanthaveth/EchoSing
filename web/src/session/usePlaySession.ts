@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import type { LineScoreMessage, SessionSummaryMessage, SongDetail } from "../api/types";
 import type { Difficulty } from "../settings/difficulty";
+import type { ScoringMode } from "../settings/mode";
 import type { SungLine } from "./lineCollector";
 import { SessionSocket, type SocketStatus } from "./sessionSocket";
 
@@ -24,6 +25,7 @@ export interface PlaySession {
     playerName: string,
     latencyMs: number,
     difficulty: Difficulty,
+    mode: ScoringMode,
   ) => Promise<boolean>;
   sendLine: (line: SungLine) => void;
   finish: () => Promise<void>;
@@ -52,7 +54,12 @@ export function usePlaySession(song: SongDetail): PlaySession {
   }, []);
 
   const start = useCallback(
-    async (playerName: string, latencyMs: number, difficulty: Difficulty) => {
+    async (
+      playerName: string,
+      latencyMs: number,
+      difficulty: Difficulty,
+      mode: ScoringMode,
+    ) => {
       socket.current?.close();
       socket.current = null;
       setLastScore(null);
@@ -63,6 +70,7 @@ export function usePlaySession(song: SongDetail): PlaySession {
           player_name: playerName,
           latency_offset_ms: latencyMs,
           difficulty,
+          mode,
         });
         if (created.analysis_id !== song.analysis_id) {
           setState({

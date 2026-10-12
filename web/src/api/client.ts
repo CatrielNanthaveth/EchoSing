@@ -1,8 +1,8 @@
 import type {
-  LineAnalysis,
   LineAttempt,
   LineDiagnostics,
   LinePractice,
+  LineScoring,
   PitchResponse,
   SessionCreate,
   SessionCreated,
@@ -112,7 +112,7 @@ export class ApiClient {
     lineIndex: number,
     attempt: LineAttempt,
     signal?: AbortSignal,
-  ): Promise<LineAnalysis> {
+  ): Promise<LineScoring> {
     return this.#request(
       `/songs/${encodeURIComponent(songId)}/lines/${String(lineIndex)}/attempt`,
       {

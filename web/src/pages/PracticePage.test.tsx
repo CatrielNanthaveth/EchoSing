@@ -9,7 +9,7 @@ import { getAudioContext, loadTrack } from "../audio/context";
 import { Microphone, type FrameListener } from "../audio/microphone";
 import { saveDifficulty } from "../settings/difficulty";
 import { saveLatency } from "../settings/latency";
-import { lineAnalysis, songDetail } from "../test/factories";
+import { lineAnalysis, lineScoring, songDetail } from "../test/factories";
 import { PracticePage } from "./PracticePage";
 
 vi.mock("../audio/context", () => ({
@@ -67,11 +67,11 @@ beforeEach(() => {
   } as unknown as Microphone);
   vi.spyOn(api, "getSong").mockResolvedValue(songDetail());
   getPitch = vi.spyOn(api, "getPitch").mockResolvedValue(PITCH);
-  scoreAttempt = vi
-    .spyOn(api, "scoreAttempt")
-    .mockResolvedValue(
-      lineAnalysis({ result: { ...lineAnalysis().result, score: 87.6 } }),
-    );
+  scoreAttempt = vi.spyOn(api, "scoreAttempt").mockResolvedValue(
+    lineScoring({
+      analysis: lineAnalysis({ result: { ...lineAnalysis().result, score: 87.6 } }),
+    }),
+  );
 });
 
 function renderPractice(path = "/songs/song-1/practica") {

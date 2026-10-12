@@ -27,6 +27,7 @@ function results(overrides: Partial<SessionResults> = {}): SessionResults {
     analysis_id: "analysis-1",
     player_name: "Ana",
     difficulty: "easy",
+    mode: "melody",
     status: "finished",
     started_at: "2026-10-08T12:00:00Z",
     finished_at: "2026-10-08T12:03:35Z",
@@ -72,7 +73,7 @@ describe("ResultsPage", () => {
     renderResults();
 
     expect(await screen.findByRole("heading", { name: "Chachacha" })).toBeVisible();
-    expect(screen.getByText("Ana · Fácil")).toBeVisible();
+    expect(screen.getByText("Ana · Melodía · Fácil")).toBeVisible();
     expect(screen.getByLabelText("Puntaje total")).toHaveTextContent("73");
     expect(screen.getByText("Afinación").nextSibling).toHaveTextContent("61%");
     expect(screen.getByText("Versos acertados").nextSibling).toHaveTextContent(
@@ -169,7 +170,9 @@ describe("ResultsPage", () => {
 
     renderResults();
 
-    expect(await screen.findByText("Ana · Fácil · sesión sin terminar")).toBeVisible();
+    expect(
+      await screen.findByText("Ana · Melodía · Fácil · sesión sin terminar"),
+    ).toBeVisible();
     expect(screen.getByLabelText("Puntaje total")).toHaveTextContent("–");
     expect(screen.getByText("Afinación").nextSibling).toHaveTextContent("–");
     expect(screen.getByRole("listitem")).toHaveTextContent("Verso 1–");

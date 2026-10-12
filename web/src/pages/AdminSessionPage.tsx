@@ -5,6 +5,7 @@ import { Line, ReferenceArea } from "recharts";
 import { ApiError, api } from "../api/client";
 import type { LineDiagnostics, LineReport } from "../api/types";
 import { PitchChart } from "../components/PitchChart";
+import { RhythmView } from "../components/RhythmView";
 import { useAsync } from "../hooks/useAsync";
 import { RAW_VOICE_COLOR, SUSPICIOUS_COLOR } from "../lib/chartColors";
 import {
@@ -16,6 +17,7 @@ import {
 import { formatDuration } from "../lib/format";
 import { practiceAdvice } from "../lib/practice";
 import { difficultyLabel } from "../settings/difficulty";
+import { modeLabel } from "../settings/mode";
 import {
   clearAdminToken,
   loadAdminToken,
@@ -135,8 +137,8 @@ function SessionDiagnostics({
     <section className="admin">
       <header>
         <p className="muted">
-          Diagnóstico · {results.player_name} · {difficultyLabel(results.difficulty)} ·{" "}
-          {results.status}
+          Diagnóstico · {results.player_name} · {modeLabel(results.mode)} ·{" "}
+          {difficultyLabel(results.difficulty)} · {results.status}
         </p>
         <h1>Sesión {results.session_id.slice(0, 8)}</h1>
         <Link to={`/sessions/${results.session_id}/results`}>Ver resultados</Link>
@@ -286,6 +288,8 @@ export function DiagnosticsView({ diagnostics }: { diagnostics: LineDiagnostics 
             )}
           </PitchChart>
         </>
+      ) : diagnostics.rhythm !== null ? (
+        <RhythmView analysis={diagnostics.rhythm} words={diagnostics.words} />
       ) : (
         <p className="muted">Sin curva cantada para este verso.</p>
       )}
@@ -325,12 +329,27 @@ export function DiagnosticsView({ diagnostics }: { diagnostics: LineDiagnostics 
       <dl className="admin-params">
         <dt>Latencia compensada</dt>
         <dd>{diagnostics.latency_ms} ms</dd>
-        <dt>Dificultad</dt>
+        <dt>Modo / dificultad</dt>
         <dd>
-          {difficultyLabel(diagnostics.difficulty)} (100% hasta{" "}
-          {diagnostics.scoring.full_credit_semitones} st, 0 desde{" "}
-          {diagnostics.scoring.zero_credit_semitones} st)
+          {modeLabel(diagnostics.mode)} · {difficultyLabel(diagnostics.difficulty)}{" "}
+          {diagnostics.mode === "rhythm"
+            ? `(100% hasta ${String(diagnostics.rhythm_scoring.full_credit_ms)} ms, 0 desde ${String(diagnostics.rhythm_scoring.zero_credit_ms)} ms)`
+            : `(100% hasta ${String(diagnostics.scoring.full_credit_semitones)} st, 0 desde ${String(diagnostics.scoring.zero_credit_semitones)} st)`}
         </dd>
+        {diagnostics.mode === "rhythm" && (
+          <>
+            <dt>Detector de golpes</dt>
+            <dd>
+              subida ≥ {diagnostics.rhythm_scoring.rise_db} dB en{" "}
+              {diagnostics.rhythm_scoring.rise_window_ms} ms, piso{" "}
+              {diagnostics.rhythm_scoring.floor_below_peak_db} dB bajo el pico,{" "}
+              {diagnostics.rhythm_scoring.refractory_ms} ms entre golpes ·{" "}
+              {diagnostics.reference_level === null
+                ? "sin volumen de referencia"
+                : "volumen de referencia disponible"}
+            </dd>
+          </>
+        )}
         <dt>Desfase máximo / penalización</dt>
         <dd>
           {diagnostics.scoring.max_warp_ms ?? "sin límite"} ms /{" "}

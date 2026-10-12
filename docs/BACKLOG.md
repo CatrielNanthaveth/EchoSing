@@ -195,6 +195,16 @@ Una canción es *jugable* si tiene análisis actual e instrumental, sin importar
 - [x] **US-6.7** Resultados (`/sessions/{id}/results`): puntaje, afinación, aciertos,
   mejor racha y cada verso (cantado, no cantado o no puntuable).
 
+## E9 — Modo Rap
+
+- [x] **US-9.1** Envolvente de volumen de la voz separada (etapa `level`, sin GPU).
+- [x] **US-9.2** El cliente manda su volumen por frame (`level_db`).
+- [x] **US-9.3** Puntaje de ritmo: ataques por subida de volumen en ambos lados,
+  emparejados en orden; tolerancias por dificultad calibradas con rap real.
+- [x] **US-9.4** Modo por sesión (`melody` | `rhythm`) en API, práctica y diagnóstico.
+- [x] **US-9.5** Selector Melodía / Rap (recordado por canción), vistas de golpes y
+  envolventes en vivo.
+
 ## Mejoras pendientes (detectadas en la prueba M4)
 
 - [x] **Alineación de letras oficiales:** alineación óptima (los estribillos repetidos

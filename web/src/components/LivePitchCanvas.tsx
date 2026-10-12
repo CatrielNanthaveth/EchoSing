@@ -6,6 +6,7 @@ import { RAW_VOICE_COLOR, SERIES_COLORS } from "../lib/chartColors";
 import { midiNoteName } from "../lib/pitch";
 import { COUNT_IN_MS } from "../session/practiceLoop";
 import type { VoicePoint } from "../session/usePractice";
+import type { ScoringMode } from "../settings/mode";
 
 const TAIL_MS = 300;
 const GRID = "#2a2f3c";
@@ -20,8 +21,13 @@ interface LivePitchCanvasProps {
   voice: RefObject<VoicePoint[]>;
   /** Song time being heard, or null when not playing. */
   clock: (() => number) | null;
+  /** Melody draws pitch curves; rap draws loudness envelopes. */
+  mode?: ScoringMode;
   height?: number;
 }
+
+/** Loudness range drawn in rap mode (dBFS). */
+const LEVEL_RANGE = [-60, 0] as const;
 
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
@@ -29,17 +35,20 @@ function median(values: number[]): number {
 }
 
 /**
- * The melody of the line and the player's voice drawn live on a canvas
+ * The line's reference and the player's voice drawn live on a canvas
  * (redrawn every frame without re-rendering React), with a playhead and a
- * count-in before the line.
+ * count-in before the line: pitch curves in melody mode, loudness envelopes
+ * in rap mode (each syllable is a jump).
  */
 export function LivePitchCanvas({
   line,
   reference,
   voice,
   clock,
+  mode = "melody",
   height = 260,
 }: LivePitchCanvasProps) {
+  const rap = mode === "rhythm";
   const canvas = useRef<HTMLCanvasElement>(null);
 
   const referenceMidi = reference.midi.map((midi, i) =>
@@ -47,8 +56,12 @@ export function LivePitchCanvas({
   );
   const voiced = referenceMidi.filter((midi): midi is number => midi !== null);
   const center = median(voiced);
-  const low = Math.floor(Math.min(...voiced, center - 3)) - 2;
-  const high = Math.ceil(Math.max(...voiced, center + 3)) + 2;
+  const [low, high] = rap
+    ? LEVEL_RANGE
+    : [
+        Math.floor(Math.min(...voiced, center - 3)) - 2,
+        Math.ceil(Math.max(...voiced, center + 3)) + 2,
+      ];
   const fromMs = line.start_ms - COUNT_IN_MS;
   const toMs = line.end_ms + TAIL_MS;
 
@@ -69,21 +82,23 @@ export function LivePitchCanvas({
     const plotWidth = width - left - 8;
     const plotHeight = height - top - 8;
     const x = (ms: number) => left + ((ms - fromMs) / (toMs - fromMs)) * plotWidth;
-    const y = (midi: number) => top + ((high - midi) / (high - low)) * plotHeight;
+    const y = (value: number) =>
+      top + ((high - Math.min(high, Math.max(low, value))) / (high - low)) * plotHeight;
 
-    // Note grid with names.
+    // Grid: note names (melody) or dB (rap).
     ctx.font = "11px system-ui, sans-serif";
     ctx.textBaseline = "middle";
-    for (let midi = Math.ceil(low); midi <= high; midi++) {
-      if (midi % 2 !== 0) continue;
+    const step = rap ? 12 : 2;
+    for (let value = Math.ceil(low); value <= high; value++) {
+      if (value % step !== 0) continue;
       ctx.strokeStyle = GRID;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(left, y(midi));
-      ctx.lineTo(width - 8, y(midi));
+      ctx.moveTo(left, y(value));
+      ctx.lineTo(width - 8, y(value));
       ctx.stroke();
       ctx.fillStyle = RAW_VOICE_COLOR;
-      ctx.fillText(midiNoteName(midi), 4, y(midi));
+      ctx.fillText(rap ? `${String(value)} dB` : midiNoteName(value), 2, y(value));
     }
 
     // Words above the plot.
@@ -98,42 +113,56 @@ export function LivePitchCanvas({
       ctx.stroke();
     }
 
-    const curve = (points: { ms: number; midi: number | null }[], color: string) => {
+    const curve = (points: { ms: number; value: number | null }[], color: string) => {
       ctx.strokeStyle = color;
       ctx.lineWidth = 3;
       ctx.lineJoin = "round";
       ctx.beginPath();
       let drawing = false;
       for (const point of points) {
-        if (point.midi === null) {
+        if (point.value === null) {
           drawing = false;
           continue;
         }
-        if (drawing) ctx.lineTo(x(point.ms), y(point.midi));
-        else ctx.moveTo(x(point.ms), y(point.midi));
+        if (drawing) ctx.lineTo(x(point.ms), y(point.value));
+        else ctx.moveTo(x(point.ms), y(point.value));
         drawing = true;
       }
       ctx.stroke();
     };
 
-    curve(
-      referenceMidi.map((midi, i) => ({
-        ms: reference.start_ms + i * reference.hop_ms,
-        midi,
-      })),
-      SERIES_COLORS.reference,
-    );
-    // The voice, moved by whole octaves to the melody's register.
-    curve(
-      voice.current.map((point) => ({
-        ms: point.songMs,
-        midi:
-          point.midi === null
-            ? null
-            : point.midi - 12 * Math.round((point.midi - center) / 12),
-      })),
-      SERIES_COLORS.voice,
-    );
+    if (rap) {
+      curve(
+        (reference.level_db ?? []).map((db, i) => ({
+          ms: reference.start_ms + i * reference.hop_ms,
+          value: db,
+        })),
+        SERIES_COLORS.reference,
+      );
+      curve(
+        voice.current.map((point) => ({ ms: point.songMs, value: point.db })),
+        SERIES_COLORS.voice,
+      );
+    } else {
+      curve(
+        referenceMidi.map((midi, i) => ({
+          ms: reference.start_ms + i * reference.hop_ms,
+          value: midi,
+        })),
+        SERIES_COLORS.reference,
+      );
+      // The voice, moved by whole octaves to the melody's register.
+      curve(
+        voice.current.map((point) => ({
+          ms: point.songMs,
+          value:
+            point.midi === null
+              ? null
+              : point.midi - 12 * Math.round((point.midi - center) / 12),
+        })),
+        SERIES_COLORS.voice,
+      );
+    }
 
     const now = clock?.();
     if (now !== undefined) {
@@ -163,7 +192,11 @@ export function LivePitchCanvas({
       className="live-pitch"
       style={{ width: "100%", height }}
       role="img"
-      aria-label="Melodía del verso y tu voz en vivo"
+      aria-label={
+        rap
+          ? "Volumen del verso y de tu voz en vivo"
+          : "Melodía del verso y tu voz en vivo"
+      }
     />
   );
 }

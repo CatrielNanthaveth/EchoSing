@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, api } from "../api/client";
 import type { SessionResults } from "../api/types";
 import { saveAdminToken } from "../settings/adminToken";
-import { lineDiagnostics } from "../test/factories";
+import { lineDiagnostics, rhythmAnalysis } from "../test/factories";
 import { AdminSessionPage } from "./AdminSessionPage";
 
 const RESULTS: SessionResults = {
@@ -15,6 +15,7 @@ const RESULTS: SessionResults = {
   analysis_id: "analysis-1",
   player_name: "Ana",
   difficulty: "normal",
+  mode: "melody",
   status: "finished",
   started_at: "2026-10-08T12:00:00Z",
   finished_at: "2026-10-08T12:03:00Z",
@@ -102,7 +103,9 @@ describe("AdminSessionPage", () => {
     expect(
       await screen.findByText(/Posible desfase de letra: mundo tiene/),
     ).toBeVisible();
-    expect(screen.getByText("Diagnóstico · Ana · Normal · finished")).toBeVisible();
+    expect(
+      screen.getByText("Diagnóstico · Ana · Melodía · Normal · finished"),
+    ).toBeVisible();
     expect(
       screen.getByText("Latencia compensada").nextElementSibling,
     ).toHaveTextContent("40 ms");
@@ -182,5 +185,21 @@ describe("AdminSessionPage", () => {
     expect(
       await screen.findByRole("heading", { name: "Página no encontrada" }),
     ).toBeVisible();
+  });
+
+  it("shows the attacks of rap sessions", async () => {
+    saveAdminToken("secret");
+    vi.spyOn(api, "getLineDiagnostics").mockResolvedValue(
+      lineDiagnostics({ mode: "rhythm", analysis: null, rhythm: rhythmAnalysis() }),
+    );
+    renderPage();
+
+    expect(await screen.findByText("Clavaste 2 de 4 golpes a tiempo.")).toBeVisible();
+    expect(screen.getByText("Modo / dificultad").nextElementSibling).toHaveTextContent(
+      "Rap · Normal (100% hasta 40 ms, 0 desde 100 ms)",
+    );
+    expect(screen.getByText("Detector de golpes").nextElementSibling).toHaveTextContent(
+      "sin volumen de referencia",
+    );
   });
 });

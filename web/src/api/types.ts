@@ -18,6 +18,7 @@ export type LineReport = Schemas["LineReport"];
 export type LinePractice = Schemas["LinePractice"];
 export type LineAnalysis = Schemas["LineAnalysis"];
 export type LineAttempt = Schemas["LineAttempt"];
+export type LineScoring = Schemas["LineScoring"];
 export type PracticeWord = Schemas["PracticeWord"];
 export type LineDiagnostics = Schemas["LineDiagnostics"];
 export type WordDiagnostics = Schemas["WordDiagnostics"];

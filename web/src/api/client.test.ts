@@ -70,6 +70,7 @@ describe("ApiClient", () => {
       player_name: "Ana",
       latency_offset_ms: 120,
       difficulty: "easy" as const,
+      mode: "melody" as const,
     };
 
     await client.createSession(body);
@@ -108,6 +109,8 @@ describe("ApiClient", () => {
       f0_hz: [0, 220],
       latency_offset_ms: 50,
       difficulty: "easy" as const,
+      mode: "rhythm" as const,
+      level_db: [-90, -20],
     };
 
     await client.scoreAttempt("s1", 4, attempt);
