@@ -199,6 +199,42 @@ class PipelineInfo(_Frozen):
     language: str | None = None
 
 
+class LevelCurve(_Frozen):
+    """Loudness of the isolated vocals; frame ``i`` is centered at ``i * hop_ms``.
+
+    Rap mode finds syllable attacks in it: unlike pitch, it also rises on
+    unvoiced consonants ("t", "k", "ch").
+
+    Attributes:
+        hop_ms: Time between consecutive frames.
+        db: RMS level per frame in dBFS, rounded to 0.1, floored at -90.
+    """
+
+    hop_ms: int = Field(gt=0)
+    db: list[float]
+
+    @property
+    def frame_count(self) -> int:
+        """Number of frames in the curve."""
+        return len(self.db)
+
+    def slice_ms(self, start_ms: int, end_ms: int) -> "LevelCurve":
+        """Return the frames whose time falls within ``[start_ms, end_ms)``.
+
+        Same frames as ``PitchCurve.slice_ms``, so both curves of a line align.
+
+        Args:
+            start_ms: Start of the window.
+            end_ms: End of the window (exclusive).
+
+        Returns:
+            A new curve with the same ``hop_ms``.
+        """
+        first = min(max(math.ceil(start_ms / self.hop_ms), 0), self.frame_count)
+        last = min(max(math.ceil(end_ms / self.hop_ms), first), self.frame_count)
+        return LevelCurve(hop_ms=self.hop_ms, db=self.db[first:last])
+
+
 class SongAnalysisData(_Frozen):
     """Complete analysis of a song, as stored in ``song_analyses.data``.
 
@@ -208,6 +244,8 @@ class SongAnalysisData(_Frozen):
         pipeline: How the analysis was produced.
         lines: Lyric lines, ordered, non-overlapping, indexed ``0..n-1``.
         pitch: Reference pitch of the isolated vocals for the whole song.
+        level: Loudness of the isolated vocals (rap mode); None in analyses
+            made before it existed.
     """
 
     format_version: Literal[1] = FORMAT_VERSION
@@ -215,6 +253,7 @@ class SongAnalysisData(_Frozen):
     pipeline: PipelineInfo
     lines: list[LyricLine]
     pitch: PitchCurve
+    level: LevelCurve | None = None
 
     @model_validator(mode="after")
     def _check_lines(self) -> Self:

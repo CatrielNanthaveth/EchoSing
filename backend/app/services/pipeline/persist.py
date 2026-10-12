@@ -9,6 +9,7 @@ from app.db.repositories.songs import SongAnalysisRepository, SongRepository
 from app.domain.enums import SongStatus
 from app.schemas.analysis import FORMAT_VERSION, PipelineInfo, SongAnalysisData
 from app.services.pipeline.errors import StageError
+from app.services.pipeline.level import load_level
 from app.services.pipeline.manifest import load_manifest
 from app.services.pipeline.pitch import load_pitch
 from app.services.pipeline.segmentation import load_lines
@@ -85,6 +86,11 @@ class PersistStage:
                 f"Song {song_id} has no pitch; run 'pitch' first"
             ) from error
 
+        try:
+            level = await load_level(self._storage, song_id)
+        except ObjectNotFoundError:
+            level = None  # optional: only rap mode needs it
+
         manifest = await load_manifest(self._storage, song_id)
         if (
             manifest.separator is None
@@ -108,6 +114,7 @@ class PersistStage:
                 pipeline=pipeline,
                 lines=lyrics.lines,
                 pitch=pitch,
+                level=level,
             )
         except ValidationError as error:
             first = error.errors()[0]

@@ -32,6 +32,7 @@ from app.db.repositories.ingestion_jobs import IngestionJobRepository
 from app.db.repositories.songs import SongRepository
 from app.db.session import create_engine, create_session_factory
 from app.domain.enums import SeparationPreset
+from app.services.pipeline.level import LevelStage
 from app.services.pipeline.persist import PersistStage
 from app.services.pipeline.pitch import PitchResult, build_pitch_stage
 from app.services.pipeline.runner import run_job
@@ -52,7 +53,7 @@ from app.storage.local import LocalStorage
 from app.workers.celery_app import celery_app
 from app.workers.queue import CeleryJobQueue
 
-STAGES = ("separate", "transcribe", "pitch", "segment", "persist")
+STAGES = ("separate", "transcribe", "pitch", "level", "segment", "persist")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -220,6 +221,8 @@ async def _run_stage(args: argparse.Namespace, settings: Settings) -> BaseModel:
                 return await PersistStage(session, storage).run(args.song_id)
             if args.stage == "segment":
                 return await SegmentationStage(session, storage).run(args.song_id)
+            if args.stage == "level":
+                return await LevelStage(session, storage).run(args.song_id)
             if args.stage == "pitch":
                 pitch = build_pitch_stage(session, storage, settings)
                 return await pitch.run(args.song_id)

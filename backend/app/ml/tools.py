@@ -48,6 +48,23 @@ async def run_tool(args: Sequence[str | Path], *, timeout_s: float) -> str:
         ToolError: If the command cannot be started, exits with a non-zero
             code or times out.
     """
+    return (await run_tool_bytes(args, timeout_s=timeout_s)).decode(errors="replace")
+
+
+async def run_tool_bytes(args: Sequence[str | Path], *, timeout_s: float) -> bytes:
+    """Run a command like ``run_tool`` and return its raw standard output.
+
+    Args:
+        args: Executable followed by its arguments (no shell is involved).
+        timeout_s: Max seconds the command may run.
+
+    Returns:
+        The standard output, undecoded (e.g. raw audio samples).
+
+    Raises:
+        ToolError: If the command cannot be started, exits with a non-zero
+            code or times out.
+    """
     command = [str(arg) for arg in args]
     name = Path(command[0]).name
     try:
@@ -65,4 +82,4 @@ async def run_tool(args: Sequence[str | Path], *, timeout_s: float) -> str:
             returncode=result.returncode,
             stderr_tail="\n".join(stderr[-STDERR_TAIL_LINES:]),
         )
-    return result.stdout.decode(errors="replace")
+    return result.stdout

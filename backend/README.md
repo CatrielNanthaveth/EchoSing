@@ -155,6 +155,7 @@ uv run python -m app.cli run-stage separate <song_id>
 uv run python -m app.cli run-stage separate <song_id> --separator roformer  # switch preset
 uv run python -m app.cli run-stage transcribe <song_id>
 uv run python -m app.cli run-stage pitch <song_id>
+uv run python -m app.cli run-stage level <song_id>      # vocals' loudness, ~1 s, no GPU
 uv run python -m app.cli run-stage segment <song_id>      # no GPU, ~0.3 s
 uv run python -m app.cli run-stage persist <song_id>      # publish the analysis
 ```
@@ -170,6 +171,7 @@ segment so that lines are built from the hallucination-filtered transcription).
 | `separate` | Separation preset (subprocess) + FFmpeg | `vocals.flac` (input for transcription and pitch), `instrumental.mp3` 192 kbps (streamed to clients), `songs.duration_ms` |
 | `transcribe` | Whisper `large-v3-turbo` CLI (subprocess) on `vocals.flac` | `work/transcription.json` (timed words; intermediate artifact, not an asset), `songs.language` if it was unknown |
 | `pitch` | torchcrepe `full` + viterbi (subprocess runner) on `vocals.flac` | `work/pitch.json` (reference pitch curve: MIDI + confidence every 10 ms); removes hallucinated phrases from the transcription |
+| `level` | FFmpeg decode + numpy RMS on `vocals.flac` | `work/level.json` (loudness of the vocals every 10 ms, for rap mode; optional in the analysis) |
 | `segment` | `app/services/lyrics.py` (pure Python) | `work/lines.json` (lyric lines with timed words; from the official lyrics when the song has them) |
 
 ### Transcription

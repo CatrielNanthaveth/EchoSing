@@ -14,6 +14,7 @@ from app.db.repositories.songs import SongRepository
 from app.db.session import create_engine, create_session_factory
 from app.domain.enums import IngestionStage, SongStatus
 from app.services.pipeline.errors import StageError
+from app.services.pipeline.level import LevelStage
 from app.services.pipeline.persist import PersistStage
 from app.services.pipeline.pitch import build_pitch_stage
 from app.services.pipeline.segmentation import SegmentationStage
@@ -165,6 +166,8 @@ def build_pipeline(
                 IngestionStage.EXTRACTING_PITCH,
                 build_pitch_stage(session, storage, settings).run,
             ),
+            # The vocals' level is cheap: reported as part of pitch extraction.
+            (IngestionStage.EXTRACTING_PITCH, LevelStage(session, storage).run),
             (IngestionStage.SEGMENTING, SegmentationStage(session, storage).run),
             (IngestionStage.PERSISTING, PersistStage(session, storage).run),
         ],

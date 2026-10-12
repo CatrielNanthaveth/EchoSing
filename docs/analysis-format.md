@@ -40,9 +40,17 @@ lyrics and the reference pitch of the isolated vocals.
     "hop_ms": 10,                       // frame i is centered at i * hop_ms
     "midi":       [null, 57.02, 57.05, 59.98],   // fractional MIDI, 0.01 steps
     "confidence": [   3,    41,    88,    95]    // voicing confidence 0..100
+  },
+  "level": {                            // optional: loudness of the vocals
+    "hop_ms": 10,                       // same frames as "pitch"
+    "db": [-90.0, -31.2, -14.8, -12.5]  // RMS dBFS, 0.1 steps, floor -90
   }
 }
 ```
+
+`level` (rap mode: syllable attacks, consonants included) is optional within
+format v1: analyses made before it existed have none, and the ``level`` +
+``persist`` stages add it without reprocessing the rest.
 
 ## Design decisions
 

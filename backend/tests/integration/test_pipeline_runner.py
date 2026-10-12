@@ -144,4 +144,11 @@ async def test_unknown_job_raises(db_session: AsyncSession) -> None:
 def test_build_pipeline_wires_stages_in_order(tmp_path: Path) -> None:
     pipeline = build_pipeline(None, LocalStorage(tmp_path), Settings(_env_file=None))  # type: ignore[arg-type]
 
-    assert [stage for stage, _ in pipeline._stages] == STAGES
+    assert [stage for stage, _ in pipeline._stages] == [
+        IngestionStage.SEPARATING,
+        IngestionStage.TRANSCRIBING,
+        IngestionStage.EXTRACTING_PITCH,  # pitch
+        IngestionStage.EXTRACTING_PITCH,  # vocals' level
+        IngestionStage.SEGMENTING,
+        IngestionStage.PERSISTING,
+    ]

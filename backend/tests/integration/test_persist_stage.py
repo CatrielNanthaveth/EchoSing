@@ -8,7 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Song
 from app.db.repositories.songs import SongAnalysisRepository, SongRepository
 from app.domain.enums import SongStatus
-from app.schemas.analysis import FORMAT_VERSION, SongAnalysisData, parse_analysis
+from app.schemas.analysis import (
+    FORMAT_VERSION,
+    LevelCurve,
+    SongAnalysisData,
+    parse_analysis,
+)
 from app.services.pipeline.errors import StageError
 from app.services.pipeline.manifest import update_manifest
 from app.services.pipeline.persist import PersistStage
@@ -45,6 +50,7 @@ async def _artifacts(
     *,
     lines: bool = True,
     pitch: bool = True,
+    level: bool = False,
     models: dict[str, str] | None = None,
 ) -> None:
     fixture = SongAnalysisData.model_validate(analysis_json)
@@ -59,6 +65,13 @@ async def _artifacts(
         await storage.save(
             work_key(song_id, "pitch.json"),
             fixture.pitch.model_dump_json().encode(),
+            "application/json",
+        )
+    if level:
+        curve = LevelCurve(hop_ms=10, db=[-40.0] * len(fixture.pitch.midi))
+        await storage.save(
+            work_key(song_id, "level.json"),
+            curve.model_dump_json().encode(),
             "application/json",
         )
     await update_manifest(storage, song_id, **(MODELS if models is None else models))
@@ -87,6 +100,34 @@ async def test_publishes_the_analysis_and_marks_the_song_ready(
     song = await db_session.get(Song, song_id)
     assert song is not None
     assert song.status is SongStatus.READY
+
+
+async def test_publishes_the_vocals_level_when_measured(
+    db_session: AsyncSession, storage: LocalStorage, analysis_json: dict[str, Any]
+) -> None:
+    song_id = await _song(db_session)
+    await _artifacts(storage, song_id, analysis_json, level=True)
+
+    result = await PersistStage(db_session, storage).run(song_id)
+
+    current = await SongAnalysisRepository(db_session).get_current(song_id)
+    assert current is not None and current.id == result.analysis_id
+    stored = parse_analysis(current.format_version, current.data)
+    assert stored.level is not None
+    assert stored.level.frame_count == 300
+
+
+async def test_level_is_optional(
+    db_session: AsyncSession, storage: LocalStorage, analysis_json: dict[str, Any]
+) -> None:
+    song_id = await _song(db_session)
+    await _artifacts(storage, song_id, analysis_json)
+
+    await PersistStage(db_session, storage).run(song_id)
+
+    current = await SongAnalysisRepository(db_session).get_current(song_id)
+    assert current is not None
+    assert parse_analysis(current.format_version, current.data).level is None
 
 
 async def test_reprocessing_creates_a_new_current_version(

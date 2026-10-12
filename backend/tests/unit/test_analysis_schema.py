@@ -35,7 +35,22 @@ def test_fixture_is_valid(analysis_json: dict[str, Any]) -> None:
 def test_json_roundtrip_is_lossless(analysis_json: dict[str, Any]) -> None:
     analysis = parse_analysis(FORMAT_VERSION, analysis_json)
 
-    assert analysis.model_dump(mode="json") == analysis_json
+    # Analyses made before the level curve existed read it as None.
+    assert analysis.model_dump(mode="json") == {**analysis_json, "level": None}
+
+
+def test_level_curve_roundtrip_and_slicing(analysis_json: dict[str, Any]) -> None:
+    level = {"hop_ms": 10, "db": [-90.0, -30.5, -12.0, -12.4, -40.0]}
+
+    analysis = parse_analysis(FORMAT_VERSION, {**analysis_json, "level": level})
+
+    assert analysis.level is not None
+    assert analysis.model_dump(mode="json")["level"] == level
+    # Same frames as the pitch curve: [10, 40) ms -> frames 1, 2, 3.
+    assert analysis.level.slice_ms(10, 40).db == [-30.5, -12.0, -12.4]
+    assert analysis.level.slice_ms(-50, 15).db == [-90.0, -30.5]
+    assert analysis.level.slice_ms(30, 10).db == []
+    assert analysis.level.frame_count == 5
 
 
 def test_unknown_format_version_is_rejected(analysis_json: dict[str, Any]) -> None:
