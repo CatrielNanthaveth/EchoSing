@@ -259,3 +259,22 @@ async def test_rap_attempts_need_level_and_a_level_curve(
 
     assert without_level.status_code == 422
     assert without_curve.status_code == 409
+
+
+async def test_line_pitch_comes_with_the_vocals_level(
+    app: FastAPI,
+    db_session: AsyncSession,
+    storage: LocalStorage,
+    song_id: uuid.UUID,
+    analysis_json: dict[str, Any],
+) -> None:
+    plain = await add_song(db_session, storage, analysis_json, "Plain")
+    async with open_client(app) as client:
+        line = (await client.get(f"/songs/{song_id}/pitch?line=2")).json()
+        song = (await client.get(f"/songs/{song_id}/pitch")).json()
+        other = (await client.get(f"/songs/{plain}/pitch?line=2")).json()
+
+    assert len(line["level_db"]) == len(line["midi"]) == 90
+    assert line["level_db"][5] == -15.0  # the attack at 2050 ms
+    assert len(song["level_db"]) == len(song["midi"])
+    assert other["level_db"] is None

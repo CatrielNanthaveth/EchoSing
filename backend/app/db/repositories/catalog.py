@@ -162,15 +162,23 @@ class CatalogRepository:
 
     async def get_current_pitch(
         self, song_id: uuid.UUID
-    ) -> tuple[uuid.UUID, dict[str, Any], list[dict[str, Any]]] | None:
-        """Fetch the pitch curve and lines of a song's current analysis.
+    ) -> (
+        tuple[
+            uuid.UUID,
+            dict[str, Any],
+            list[dict[str, Any]],
+            dict[str, Any] | None,
+        ]
+        | None
+    ):
+        """Fetch the pitch curve, lines and level of a song's current analysis.
 
         Args:
             song_id: Id of the song.
 
         Returns:
-            The analysis id, the raw ``pitch`` value and the raw ``lines``
-            value, or None if the song has no current analysis.
+            The analysis id and the raw ``pitch``, ``lines`` and ``level``
+            values (level None when absent), or None without current analysis.
         """
         row = (
             await self._session.execute(
@@ -178,10 +186,11 @@ class CatalogRepository:
                     SongAnalysis.id,
                     SongAnalysis.data["pitch"],
                     SongAnalysis.data["lines"],
+                    SongAnalysis.data["level"],
                 ).where(SongAnalysis.song_id == song_id, SongAnalysis.is_current)
             )
         ).first()
         if row is None:
             return None
-        analysis_id, pitch, lines = row
-        return analysis_id, pitch, lines
+        analysis_id, pitch, lines, level = row
+        return analysis_id, pitch, lines, level

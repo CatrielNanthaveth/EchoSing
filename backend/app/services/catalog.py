@@ -12,7 +12,7 @@ from app.db.repositories.catalog import CatalogRepository, PlayableSong
 from app.db.repositories.song_assets import SongAssetRepository
 from app.db.session import get_db_session
 from app.domain.enums import AssetKind, SongStatus
-from app.schemas.analysis import LyricLine, PitchCurve
+from app.schemas.analysis import LevelCurve, LyricLine, PitchCurve
 from app.schemas.catalog import PitchResponse, SongDetail, SongPage, SongSummary
 from app.services.errors import SongNotFoundError
 
@@ -86,8 +86,9 @@ class CatalogService:
         )
         if current is None:
             raise SongNotFoundError(f"Song {song_id} is not available")
-        analysis_id, raw_pitch, raw_lines = current
+        analysis_id, raw_pitch, raw_lines, raw_level = current
         curve = PitchCurve.model_validate(raw_pitch)
+        level = None if raw_level is None else LevelCurve.model_validate(raw_level)
         start_ms = 0
         if line_index is not None:
             if not 0 <= line_index < len(raw_lines):
@@ -96,6 +97,8 @@ class CatalogService:
             first_frame = math.ceil(line.start_ms / curve.hop_ms)
             start_ms = first_frame * curve.hop_ms
             curve = curve.slice_ms(line.start_ms, line.end_ms)
+            if level is not None:
+                level = level.slice_ms(line.start_ms, line.end_ms)
         return PitchResponse(
             analysis_id=analysis_id,
             line_index=line_index,
@@ -103,6 +106,7 @@ class CatalogService:
             hop_ms=curve.hop_ms,
             midi=curve.midi,
             confidence=curve.confidence,
+            level_db=None if level is None else level.db,
         )
 
     async def get_instrumental(self, song_id: uuid.UUID) -> InstrumentalAudio:

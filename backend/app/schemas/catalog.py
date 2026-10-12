@@ -75,6 +75,8 @@ class PitchResponse(BaseModel):
         hop_ms: Time between frames.
         midi: Pitch per frame as fractional MIDI note; None without estimate.
         confidence: Voicing confidence per frame, 0-100.
+        level_db: Loudness of the reference vocals per frame (dBFS), same
+            frames; None when the analysis has no level (rap mode needs it).
     """
 
     analysis_id: uuid.UUID
@@ -83,6 +85,7 @@ class PitchResponse(BaseModel):
     hop_ms: int
     midi: list[float | None]
     confidence: list[int]
+    level_db: list[float] | None = None
 
 
 class JobReport(BaseModel):
