@@ -4,6 +4,14 @@ import type { LyricLine } from "../api/types";
 export const LINE_TAIL_MS = 300;
 /** Maximum frames per message accepted by the server. */
 const MAX_FRAMES = 6000;
+/** Level of silence and of missing frames (dBFS); the server accepts >= -120. */
+export const SILENT_DB = -90;
+
+/** Microphone level of an RMS value in dBFS, floored and rounded to 0.1 dB. */
+export function levelDb(rms: number): number {
+  if (!(rms > 0)) return SILENT_DB;
+  return Math.max(SILENT_DB, Math.round(200 * Math.log10(rms)) / 10);
+}
 
 /** The pitch sung over one line, ready to send as `line_pitch`. */
 export interface SungLine {
@@ -11,11 +19,14 @@ export interface SungLine {
   hopMs: number;
   /** Pitch per frame from the line start, 0 where unvoiced. */
   f0Hz: number[];
+  /** Microphone level per frame (dBFS), same frames as `f0Hz`. */
+  levelDb: number[];
 }
 
 interface Frame {
   songMs: number;
   f0: number;
+  db: number;
 }
 
 /**
@@ -43,9 +54,13 @@ export class LineCollector {
     this.#onLine = onLine;
   }
 
-  /** Add a frame; frames must arrive in time order. */
-  add(songMs: number, f0: number): void {
-    this.#frames.push({ songMs, f0: f0 > 0 ? f0 : 0 });
+  /**
+   * Add a frame; frames must arrive in time order.
+   *
+   * @param db Microphone level (dBFS), see `levelDb`.
+   */
+  add(songMs: number, f0: number, db = SILENT_DB): void {
+    this.#frames.push({ songMs, f0: f0 > 0 ? f0 : 0, db });
     let line = this.#lines[this.#next];
     while (line !== undefined && songMs >= line.end_ms + LINE_TAIL_MS) {
       this.#emit(line);
@@ -77,6 +92,7 @@ export class LineCollector {
       Math.ceil((line.end_ms + LINE_TAIL_MS - line.start_ms) / hop),
     );
     const f0Hz = new Array<number>(count).fill(0);
+    const levels = new Array<number>(count).fill(SILENT_DB);
     let cursor = 0;
     for (let k = 0; k < count; k++) {
       const target = line.start_ms + k * hop;
@@ -92,9 +108,15 @@ export class LineCollector {
       // A gap (e.g. a dropped audio block) counts as unvoiced.
       if (frame !== undefined && Math.abs(frame.songMs - target) <= hop / 2 + 0.01) {
         f0Hz[k] = Math.round(frame.f0 * 10) / 10;
+        levels[k] = frame.db;
       }
     }
-    this.#onLine({ lineIndex: line.index, hopMs: Math.round(hop * 1000) / 1000, f0Hz });
+    this.#onLine({
+      lineIndex: line.index,
+      hopMs: Math.round(hop * 1000) / 1000,
+      f0Hz,
+      levelDb: levels,
+    });
   }
 
   /** Drop frames before the next line: they will never be used again. */

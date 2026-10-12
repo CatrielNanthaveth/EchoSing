@@ -1,13 +1,13 @@
 """Schemas of the line analysis: practice charts and admin diagnostics."""
 
 import uuid
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.domain.enums import Difficulty
 from app.schemas.analysis import PipelineInfo, PitchCurve
-from app.schemas.sessions import MAX_PITCH_FRAMES, SungPitch
+from app.schemas.sessions import MAX_PITCH_FRAMES, LevelDb, SungPitch
 from app.scoring.analysis import LineAnalysis
 from app.scoring.line_score import ScoringConfig
 
@@ -24,6 +24,8 @@ class LineAttempt(BaseModel):
         hop_ms: Time between pitch frames.
         f0_hz: Pitch per frame in Hz from the line start (0 = no voice), as in
             the ``line_pitch`` message (send ~300 ms past the line end).
+        level_db: Optional microphone level per frame (dBFS), as in
+            ``line_pitch``.
         latency_offset_ms: Latency measured by the client's calibration.
         difficulty: Pitch tolerance.
     """
@@ -33,8 +35,15 @@ class LineAttempt(BaseModel):
     f0_hz: list[Annotated[float, Field(ge=0, le=5000)]] = Field(
         max_length=MAX_PITCH_FRAMES
     )
+    level_db: list[LevelDb] | None = Field(default=None, max_length=MAX_PITCH_FRAMES)
     latency_offset_ms: int = Field(default=0, ge=-500, le=1000)
     difficulty: Difficulty = Difficulty.NORMAL
+
+    @model_validator(mode="after")
+    def _check_level_frames(self) -> Self:
+        if self.level_db is not None and len(self.level_db) != len(self.f0_hz):
+            raise ValueError("level_db must have one value per f0_hz frame")
+        return self
 
 
 class PracticeWord(BaseModel):

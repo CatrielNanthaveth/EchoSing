@@ -1146,6 +1146,23 @@
             "maxItems": 6000,
             "title": "F0 Hz"
           },
+          "level_db": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number",
+                  "maximum": 0.0,
+                  "minimum": -120.0
+                },
+                "type": "array",
+                "maxItems": 6000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Db"
+          },
           "latency_offset_ms": {
             "type": "integer",
             "maximum": 1000.0,
@@ -1165,7 +1182,7 @@
           "f0_hz"
         ],
         "title": "LineAttempt",
-        "description": "A practice attempt at one line, scored but not stored.\n\nAttributes:\n    analysis_id: Analysis whose lines and pitch the client is using.\n    hop_ms: Time between pitch frames.\n    f0_hz: Pitch per frame in Hz from the line start (0 = no voice), as in\n        the ``line_pitch`` message (send ~300 ms past the line end).\n    latency_offset_ms: Latency measured by the client's calibration.\n    difficulty: Pitch tolerance."
+        "description": "A practice attempt at one line, scored but not stored.\n\nAttributes:\n    analysis_id: Analysis whose lines and pitch the client is using.\n    hop_ms: Time between pitch frames.\n    f0_hz: Pitch per frame in Hz from the line start (0 = no voice), as in\n        the ``line_pitch`` message (send ~300 ms past the line end).\n    level_db: Optional microphone level per frame (dBFS), as in\n        ``line_pitch``.\n    latency_offset_ms: Latency measured by the client's calibration.\n    difficulty: Pitch tolerance."
       },
       "LineDiagnostics": {
         "properties": {
@@ -2306,6 +2323,20 @@
             },
             "type": "array",
             "title": "F0 Hz"
+          },
+          "level_db": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Db"
           }
         },
         "type": "object",
@@ -2314,7 +2345,7 @@
           "f0_hz"
         ],
         "title": "SungPitch",
-        "description": "Pitch the player sang over one line, as stored for later analysis.\n\nAttributes:\n    hop_ms: Time between frames.\n    f0_hz: Pitch per frame from the line start, 0 where unvoiced."
+        "description": "Pitch the player sang over one line, as stored for later analysis.\n\nAttributes:\n    hop_ms: Time between frames.\n    f0_hz: Pitch per frame from the line start, 0 where unvoiced.\n    level_db: Microphone level per frame (dBFS), if the client sent it."
       },
       "ValidationError": {
         "properties": {
@@ -2487,7 +2518,7 @@
         "type": "object"
       },
       "LinePitchMessage": {
-        "description": "Client -> server: the pitch the player sang over one line.\n\nAttributes:\n    type: Message type.\n    line_index: Line that was sung.\n    hop_ms: Time between pitch frames.\n    f0_hz: Pitch per frame in Hz, from the line start (0 = no voice). Send a\n        little more than the line (~300 ms) for latency compensation.",
+        "description": "Client -> server: the pitch the player sang over one line.\n\nAttributes:\n    type: Message type.\n    line_index: Line that was sung.\n    hop_ms: Time between pitch frames.\n    f0_hz: Pitch per frame in Hz, from the line start (0 = no voice). Send a\n        little more than the line (~300 ms) for latency compensation.\n    level_db: Optional microphone level per frame (dBFS), same frames as\n        ``f0_hz``; rap mode finds syllable attacks in it.",
         "properties": {
           "type": {
             "const": "line_pitch",
@@ -2514,6 +2545,24 @@
             "maxItems": 6000,
             "title": "F0 Hz",
             "type": "array"
+          },
+          "level_db": {
+            "anyOf": [
+              {
+                "items": {
+                  "maximum": 0,
+                  "minimum": -120,
+                  "type": "number"
+                },
+                "maxItems": 6000,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Level Db"
           }
         },
         "required": [

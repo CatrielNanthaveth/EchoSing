@@ -14,7 +14,7 @@ import {
 } from "./sessionSocket";
 
 function line(index: number) {
-  return { line_index: index, hop_ms: 10.667, f0_hz: [0, 220] };
+  return { line_index: index, hop_ms: 10.667, f0_hz: [0, 220], level_db: [-90, -20] };
 }
 
 function open(events: SessionSocketEvents = {}) {

@@ -3,9 +3,9 @@
 import uuid
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.domain.enums import Difficulty, PlaySessionStatus
 
@@ -58,6 +58,23 @@ class SessionCreated(BaseModel):
 MAX_PITCH_FRAMES = 6000
 """At most 60 s of pitch at 10 ms per line message."""
 
+LevelDb = Annotated[float, Field(ge=-120, le=0)]
+"""Microphone level of a frame in dBFS."""
+
+
+class _SungCurve(BaseModel):
+    """Pitch (and optionally level) sung over a line, frame by frame."""
+
+    hop_ms: float
+    f0_hz: list[float]
+    level_db: list[float] | None = None
+
+    @model_validator(mode="after")
+    def _check_level_frames(self) -> Self:
+        if self.level_db is not None and len(self.level_db) != len(self.f0_hz):
+            raise ValueError("level_db must have one value per f0_hz frame")
+        return self
+
 
 class LinePitchMessage(BaseModel):
     """Client -> server: the pitch the player sang over one line.
@@ -68,6 +85,8 @@ class LinePitchMessage(BaseModel):
         hop_ms: Time between pitch frames.
         f0_hz: Pitch per frame in Hz, from the line start (0 = no voice). Send a
             little more than the line (~300 ms) for latency compensation.
+        level_db: Optional microphone level per frame (dBFS), same frames as
+            ``f0_hz``; rap mode finds syllable attacks in it.
     """
 
     type: Literal["line_pitch"]
@@ -76,6 +95,13 @@ class LinePitchMessage(BaseModel):
     f0_hz: list[Annotated[float, Field(ge=0, le=5000)]] = Field(
         max_length=MAX_PITCH_FRAMES
     )
+    level_db: list[LevelDb] | None = Field(default=None, max_length=MAX_PITCH_FRAMES)
+
+    @model_validator(mode="after")
+    def _check_level_frames(self) -> Self:
+        if self.level_db is not None and len(self.level_db) != len(self.f0_hz):
+            raise ValueError("level_db must have one value per f0_hz frame")
+        return self
 
 
 class ReadyMessage(BaseModel):
@@ -150,16 +176,14 @@ class FinishMessage(BaseModel):
     type: Literal["finish"]
 
 
-class SungPitch(BaseModel):
+class SungPitch(_SungCurve):
     """Pitch the player sang over one line, as stored for later analysis.
 
     Attributes:
         hop_ms: Time between frames.
         f0_hz: Pitch per frame from the line start, 0 where unvoiced.
+        level_db: Microphone level per frame (dBFS), if the client sent it.
     """
-
-    hop_ms: float
-    f0_hz: list[float]
 
 
 ClientMessage = Annotated[LinePitchMessage | FinishMessage, Field(discriminator="type")]

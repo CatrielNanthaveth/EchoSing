@@ -213,8 +213,10 @@ class PlaySessionService:
                 scorable=result.scorable,
                 voiced_frames=result.voiced_frames,
                 sung_pitch=SungPitch(
-                    hop_ms=message.hop_ms, f0_hz=message.f0_hz
-                ).model_dump(),
+                    hop_ms=message.hop_ms,
+                    f0_hz=message.f0_hz,
+                    level_db=message.level_db,
+                ).model_dump(exclude_none=True),
             )
             await self._session.commit()
         except IntegrityError as error:  # scored concurrently by another socket

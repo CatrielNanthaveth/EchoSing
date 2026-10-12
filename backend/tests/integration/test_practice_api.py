@@ -179,6 +179,7 @@ async def test_diagnostics_show_inputs_parameters_and_word_timing(
     assert body["sung_input"] == {
         "hop_ms": HOP_MS,
         "f0_hz": sung_line(analysis_json, 0, delay_frames=5),
+        "level_db": None,  # this client did not send its level
     }
     words = body["word_timing"]
     assert [word["text"] for word in words] == ["Hello", "darkness,", "my"]
@@ -318,6 +319,8 @@ async def test_attempt_needs_an_analysis_of_that_song(
         {"f0_hz": [-1.0]},
         {"latency_offset_ms": 2000},
         {"difficulty": "extreme"},
+        {"level_db": [-20.0, -20.0]},  # one level per f0 frame
+        {"level_db": [5.0]},  # above 0 dBFS
     ],
 )
 async def test_invalid_attempts_are_rejected(

@@ -64,6 +64,8 @@ drop and continue where it left off.
 - Send frames until `end_ms + 300 ms`: the server shifts the curve by the session
   latency and drops anything past the end of the line.
 - `hop_ms`: time between frames, 5..50 (e.g. 512 samples at 44.1 kHz = 11.61 ms).
+- `level_db` (optional): microphone level per frame in dBFS (-120..0), same frames
+  as `f0_hz`. Rap mode finds syllable attacks in it (consonants have no pitch).
 - At most 6000 frames per message.
 
 Reply:

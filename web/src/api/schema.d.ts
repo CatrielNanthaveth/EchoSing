@@ -426,6 +426,8 @@ export interface components {
          *         hop_ms: Time between pitch frames.
          *         f0_hz: Pitch per frame in Hz from the line start (0 = no voice), as in
          *             the ``line_pitch`` message (send ~300 ms past the line end).
+         *         level_db: Optional microphone level per frame (dBFS), as in
+         *             ``line_pitch``.
          *         latency_offset_ms: Latency measured by the client's calibration.
          *         difficulty: Pitch tolerance.
          */
@@ -439,6 +441,8 @@ export interface components {
             hop_ms: number;
             /** F0 Hz */
             f0_hz: number[];
+            /** Level Db */
+            level_db?: number[] | null;
             /**
              * Latency Offset Ms
              * @default 0
@@ -1137,12 +1141,15 @@ export interface components {
          *     Attributes:
          *         hop_ms: Time between frames.
          *         f0_hz: Pitch per frame from the line start, 0 where unvoiced.
+         *         level_db: Microphone level per frame (dBFS), if the client sent it.
          */
         SungPitch: {
             /** Hop Ms */
             hop_ms: number;
             /** F0 Hz */
             f0_hz: number[];
+            /** Level Db */
+            level_db?: number[] | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -1249,6 +1256,8 @@ export interface components {
          *         hop_ms: Time between pitch frames.
          *         f0_hz: Pitch per frame in Hz, from the line start (0 = no voice). Send a
          *             little more than the line (~300 ms) for latency compensation.
+         *         level_db: Optional microphone level per frame (dBFS), same frames as
+         *             ``f0_hz``; rap mode finds syllable attacks in it.
          */
         LinePitchMessage: {
             /**
@@ -1262,6 +1271,11 @@ export interface components {
             hop_ms: number;
             /** F0 Hz */
             f0_hz: number[];
+            /**
+             * Level Db
+             * @default null
+             */
+            level_db: number[] | null;
         };
         /**
          * LineScoreMessage

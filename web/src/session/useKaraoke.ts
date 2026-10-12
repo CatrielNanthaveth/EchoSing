@@ -6,7 +6,7 @@ import { getAudioContext, loadTrack, outputLatencyMs } from "../audio/context";
 import { HOP_SIZE } from "../audio/frameAnalyzer";
 import { Microphone, microphoneErrorMessage } from "../audio/microphone";
 import { Playback } from "../audio/playback";
-import { LineCollector, type SungLine } from "./lineCollector";
+import { LineCollector, levelDb, type SungLine } from "./lineCollector";
 
 export type KaraokePhase =
   | { name: "idle" }
@@ -100,7 +100,7 @@ export function useKaraoke(
       );
       const unsubscribe = microphone.subscribe((frame) => {
         const songMs = player.songTimeAt(frame.time);
-        if (songMs >= 0) collector.add(songMs, frame.f0);
+        if (songMs >= 0) collector.add(songMs, frame.f0, levelDb(frame.rms));
       });
       capture.current = unsubscribe;
 

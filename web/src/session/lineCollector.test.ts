@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { lyricLine } from "../test/factories";
-import { LINE_TAIL_MS, LineCollector, type SungLine } from "./lineCollector";
+import {
+  LINE_TAIL_MS,
+  LineCollector,
+  SILENT_DB,
+  levelDb,
+  type SungLine,
+} from "./lineCollector";
 
 const HOP = 10;
 
@@ -108,5 +114,39 @@ describe("LineCollector", () => {
     feed(collector, 0, 100_400, () => 220, 10);
 
     expect(sung[0]?.f0Hz).toHaveLength(6000);
+  });
+
+  it("sends the microphone level with each frame", () => {
+    const { collector, sung } = collect();
+
+    for (let ms = 0; ms < 2000; ms += HOP) {
+      collector.add(ms, ms < 1050 ? 0 : 220, ms < 1050 ? -70 : -18.5);
+    }
+
+    const levels = sung[0]?.levelDb ?? [];
+    expect(levels).toHaveLength(sung[0]?.f0Hz.length ?? -1);
+    expect(levels.slice(0, 5)).toEqual([-70, -70, -70, -70, -70]);
+    expect(levels[6]).toBe(-18.5);
+  });
+
+  it("marks frames without level as silent", () => {
+    const { collector, sung } = collect();
+
+    for (let ms = 0; ms < 2000; ms += HOP) collector.add(ms, 220);
+
+    expect(new Set(sung[0]?.levelDb)).toEqual(new Set([SILENT_DB]));
+  });
+});
+
+describe("levelDb", () => {
+  it.each([
+    [1, 0],
+    [0.1, -20],
+    [0.0123, -38.2],
+    [1e-6, SILENT_DB],
+    [0, SILENT_DB],
+    [Number.NaN, SILENT_DB],
+  ])("converts RMS %f to %f dBFS", (rms, db) => {
+    expect(levelDb(rms)).toBe(db);
   });
 });

@@ -1,7 +1,7 @@
 import type { LineAnalysis, LyricLine } from "../api/types";
 import type { Microphone } from "../audio/microphone";
 import type { Playback } from "../audio/playback";
-import { LINE_TAIL_MS, LineCollector, type SungLine } from "./lineCollector";
+import { LINE_TAIL_MS, LineCollector, levelDb, type SungLine } from "./lineCollector";
 
 /** Music played before the line, so the singer can come in on time. */
 export const COUNT_IN_MS = 2000;
@@ -99,7 +99,7 @@ export class PracticeLoop {
     this.#unsubscribe = microphone.subscribe((frame) => {
       const songMs = playback.songTimeAt(frame.time);
       if (songMs < line.start_ms - COUNT_IN_MS) return;
-      collector.add(songMs, frame.f0);
+      collector.add(songMs, frame.f0, levelDb(frame.rms));
       onVoice?.(songMs, frame.f0);
     });
 

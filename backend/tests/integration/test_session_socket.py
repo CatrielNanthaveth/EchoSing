@@ -273,6 +273,30 @@ async def test_line_with_too_little_singing_is_recorded_unscored(
 # --- errors keep the connection open --------------------------------------------------
 
 
+async def test_the_microphone_level_is_stored_with_the_pitch(
+    ws_app: FastAPI,
+    db_session: AsyncSession,
+    song_id: uuid.UUID,
+    analysis_json: dict[str, Any],
+) -> None:
+    f0 = sung_line(analysis_json, 0)
+    levels = [-60.0 if hz == 0 else -18.5 for hz in f0]
+    async with open_client(ws_app) as client:
+        session_id = await start_session(client, song_id)
+        async with connect(client, session_id) as ws:
+            await receive(ws)
+            message = json.loads(pitch_message(0, f0))
+            await ws.send_text(json.dumps({**message, "level_db": levels}))
+            scored = await receive(ws)
+
+    assert scored["score"] == 100.0
+    stored = await PlaySessionRepository(db_session).get_line_score(
+        uuid.UUID(session_id), 0
+    )
+    assert stored is not None and stored.sung_pitch is not None
+    assert stored.sung_pitch["level_db"] == levels
+
+
 async def test_errors_are_reported_without_closing(
     ws_app: FastAPI, song_id: uuid.UUID, analysis_json: dict[str, Any]
 ) -> None:
@@ -293,6 +317,9 @@ async def test_errors_are_reported_without_closing(
             negative = await receive(ws)
             await ws.send_text(json.dumps({"type": "line_pitch", "line_index": 1}))
             incomplete = await receive(ws)
+            mismatched = json.loads(pitch_message(1, [220.0, 220.0]))
+            await ws.send_text(json.dumps({**mismatched, "level_db": [-20.0]}))
+            wrong_levels = await receive(ws)
 
             # The connection is still usable after all those errors.
             await ws.send_text(pitch_message(1, sung_line(analysis_json, 1)))
@@ -300,9 +327,12 @@ async def test_errors_are_reported_without_closing(
 
     assert duplicate["code"] == "line_already_scored"
     assert unknown["code"] == "unknown_line"
-    assert {garbage["code"], negative["code"], incomplete["code"]} == {
-        "invalid_message"
-    }
+    assert {
+        garbage["code"],
+        negative["code"],
+        incomplete["code"],
+        wrong_levels["code"],
+    } == {"invalid_message"}
     assert still_working["score"] == 100.0
 
 

@@ -93,6 +93,7 @@ export function usePlaySession(song: SongDetail): PlaySession {
       line_index: line.lineIndex,
       hop_ms: line.hopMs,
       f0_hz: line.f0Hz,
+      level_db: line.levelDb,
     });
   }, []);
 

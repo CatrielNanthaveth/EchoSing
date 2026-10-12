@@ -97,6 +97,7 @@ export function usePractice(
           analysis_id: song.analysis_id,
           hop_ms: sung.hopMs,
           f0_hz: sung.f0Hz,
+          level_db: sung.levelDb,
           latency_offset_ms: settings.current.latencyMs,
           difficulty: settings.current.difficulty,
         }),
